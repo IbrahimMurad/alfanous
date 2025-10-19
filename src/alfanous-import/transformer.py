@@ -59,16 +59,16 @@ class Transformer:
     def build_schema( self, tablename ):
         """build schema from field table"""
 
-        print "require list of fields ..."
+        print( "require list of fields ..." )
         cur = self.__mainDb.cursor()
         cur.execute( "select search_name,type,analyser,is_stored,boost,phrase,is_scorable,is_unique,format from field where table_name='" + tablename + "' and is_indexed='yes'" )
         res = cur.fetchall()
 
-        print "processing list found  and building raw schema ..."
+        print( "processing list found  and building raw schema ..." )
         Schema_raw = "Schema("
         for line  in res:
 
-            print line
+            print( line )
             search_name = str( line[0] )
             if search_name not in ["", "None"]:
                 #1
@@ -125,9 +125,9 @@ class Transformer:
                 Schema_raw += "),"
         else: pass #ignored
         Schema_raw = Schema_raw[:-1] + ")"
-        print Schema_raw
+        print( Schema_raw )
         resSchema = None
-        exec "resSchema=" + Schema_raw
+        exec("resSchema=" + Schema_raw)
 
         #print resSchema
         return resSchema
@@ -164,7 +164,7 @@ class Transformer:
         Data = cur.fetchall()
 
 
-        print "writing documents in index (total: %d) ...." % len( Data )
+        print( "writing documents in index (total: %d) ...." % len( Data ) )
         writer = ix.writer()
 
         cpt = 0
@@ -181,13 +181,15 @@ class Transformer:
 
             write_cmd = write_cmd[:-1] + ")"
             #print write_cmd
-            exec write_cmd
-            try: pass
-            except: print "ERROR"
+            exec( write_cmd )
+            try:
+                pass
+            except:
+                print( "ERROR" )
             cpt += 1
             if not cpt % 1000:
-            	print " - milestone:", cpt, "( %d%% )" % ( cpt * 100 / len( Data ) )
-        print "done."
+                print( " - milestone:", cpt, "( %d%% )" % ( cpt * 100 / len( Data ) ) )
+        print( "done." )
         writer.commit()
         self.__lock_docindex( ix )
 
@@ -246,7 +248,7 @@ class Transformer:
         standard2uthmani = {}
         for item in cur.fetchall():
             if item[0] != item[1] and item[1]:
-		standard2uthmani[item[0]] = item[1]
+                standard2uthmani[item[0]] = item[1]
 
 
         raw_str = self.dheader + u"\nstd2uth_words=" + str( standard2uthmani ).replace( ",", ",\n" )

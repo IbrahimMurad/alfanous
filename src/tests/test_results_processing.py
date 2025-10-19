@@ -8,9 +8,5 @@ This is a test module for alfanous.ResultsProcessing.
 from alfanous.results_processing import Qhighlight
 
 if __name__ == "__main__":
-    H = Qhighlight( 
-                   u"الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ", 
-                   [u"الحمد", u"لله"], 
-                   "html" 
-                   )
-    print H
+    H = Qhighlight("الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ", ["الحمد", "لله"], "html")
+    print(H)

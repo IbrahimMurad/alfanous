@@ -1,7 +1,7 @@
 """
 This module contains the default search query parser.
 
-This uses the excellent Pyparsing module 
+This uses the excellent Pyparsing module
 (http://pyparsing.sourceforge.net/) to parse search query strings
 into nodes from the query module.
 
@@ -31,7 +31,7 @@ http://pyparsing.wikispaces.com/space/showimage/searchparser.py
 # * Redistributions of source code must retain the above copyright notice, this
 #   list of conditions and the following disclaimer.
 # * Redistributions in binary form must reproduce the above copyright notice,
-#   this list of conditions and the following disclaimer in the documentation 
+#   this list of conditions and the following disclaimer in the documentation
 #   and/or other materials provided with the distribution.
 # * Neither the name of Estrate nor the names of its contributors may be used
 #   to endorse or promote products derived from this software without specific
@@ -54,21 +54,36 @@ http://pyparsing.wikispaces.com/space/showimage/searchparser.py
 # - Rudolph Froger
 # - Paul McGuire
 
-from pyparsing import (printables, alphanums, OneOrMore,
-                                      Group, Combine, Suppress, Optional,
-                                      FollowedBy, Literal, CharsNotIn, Word,
-                                      Keyword, Empty, White, Forward,
-                                      QuotedString, StringEnd)
+from pyparsing import (
+    CharsNotIn,
+    Combine,
+    Empty,
+    FollowedBy,
+    Forward,
+    Group,
+    Keyword,
+    Literal,
+    OneOrMore,
+    Optional,
+    QuotedString,
+    StringEnd,
+    Suppress,
+    White,
+    Word,
+    alphanums,
+    printables,
+)
+
 from alfanous.Support.whoosh.query import *
 
 
 def _make_default_parser():
     escapechar = "\\"
 
-    #wordchars = printables
-    #for specialchar in '*?^():"{}[] ' + escapechar:
+    # wordchars = printables
+    # for specialchar in '*?^():"{}[] ' + escapechar:
     #    wordchars = wordchars.replace(specialchar, "")
-    #wordtext = Word(wordchars)
+    # wordtext = Word(wordchars)
 
     wordtext = CharsNotIn('\\*?^():"{}[] ')
     escape = Suppress(escapechar) + (Word(printables, exact=1) | White(exact=1))
@@ -82,17 +97,27 @@ def _make_default_parser():
     # Start with word chars and then have wild chars mixed in
     wildmixed = wordtoken + OneOrMore(wildchars + Optional(wordtoken))
     # Or, start with wildchars, and then either a mixture of word and wild chars, or the next token
-    wildstart = wildchars + (OneOrMore(wordtoken + Optional(wildchars)) | FollowedBy(White() | StringEnd()))
+    wildstart = wildchars + (
+        OneOrMore(wordtoken + Optional(wildchars)) | FollowedBy(White() | StringEnd())
+    )
     wildcard = Group(Combine(wildmixed | wildstart)).setResultsName("Wildcard")
 
     # A range of terms
     startfence = Literal("[") | Literal("{")
     endfence = Literal("]") | Literal("}")
     rangeitem = QuotedString('"') | wordtoken
-    openstartrange = Group(Empty()) + Suppress(Keyword("TO") + White()) + Group(rangeitem)
+    openstartrange = (
+        Group(Empty()) + Suppress(Keyword("TO") + White()) + Group(rangeitem)
+    )
     openendrange = Group(rangeitem) + Suppress(White() + Keyword("TO")) + Group(Empty())
-    normalrange = Group(rangeitem) + Suppress(White() + Keyword("TO") + White()) + Group(rangeitem)
-    range = Group(startfence + (normalrange | openstartrange | openendrange) + endfence).setResultsName("Range")
+    normalrange = (
+        Group(rangeitem)
+        + Suppress(White() + Keyword("TO") + White())
+        + Group(rangeitem)
+    )
+    range = Group(
+        startfence + (normalrange | openstartrange | openendrange) + endfence
+    ).setResultsName("Range")
 
     # A word-like thing
     generalWord = range | wildcard | plainWord
@@ -103,42 +128,71 @@ def _make_default_parser():
     expression = Forward()
 
     # Parentheses can enclose (group) any expression
-    parenthetical = Group((Suppress("(") + expression + Suppress(")"))).setResultsName("Group")
+    parenthetical = Group((Suppress("(") + expression + Suppress(")"))).setResultsName(
+        "Group"
+    )
 
     boostableUnit = generalWord | quotedPhrase
-    boostedUnit = Group(boostableUnit + Suppress("^") + Word("0123456789", ".0123456789")).setResultsName("Boost")
+    boostedUnit = Group(
+        boostableUnit + Suppress("^") + Word("0123456789", ".0123456789")
+    ).setResultsName("Boost")
 
     # The user can flag that a parenthetical group, quoted phrase, or word
     # should be searched in a particular field by prepending 'fn:', where fn is
     # the name of the field.
     fieldableUnit = parenthetical | boostedUnit | boostableUnit
-    fieldedUnit = Group(Word(alphanums + "_") + Suppress(':') + fieldableUnit).setResultsName("Field")
+    fieldedUnit = Group(
+        Word(alphanums + "_") + Suppress(":") + fieldableUnit
+    ).setResultsName("Field")
 
     # Units of content
     unit = fieldedUnit | fieldableUnit
 
     # A unit may be "not"-ed.
-    operatorNot = Group(Suppress(Keyword("not", caseless=True)) + Suppress(White()) + unit).setResultsName("Not")
+    operatorNot = Group(
+        Suppress(Keyword("not", caseless=True)) + Suppress(White()) + unit
+    ).setResultsName("Not")
     generalUnit = operatorNot | unit
 
     andToken = Keyword("AND", caseless=False)
     orToken = Keyword("OR", caseless=False)
     andNotToken = Keyword("ANDNOT", caseless=False)
 
-    operatorAnd = Group(generalUnit + Suppress(White()) + Suppress(andToken) + Suppress(White()) + expression).setResultsName("And")
-    operatorOr = Group(generalUnit + Suppress(White()) + Suppress(orToken) + Suppress(White()) + expression).setResultsName("Or")
-    operatorAndNot = Group(unit + Suppress(White()) + Suppress(andNotToken) + Suppress(White()) + unit).setResultsName("AndNot")
+    operatorAnd = Group(
+        generalUnit
+        + Suppress(White())
+        + Suppress(andToken)
+        + Suppress(White())
+        + expression
+    ).setResultsName("And")
+    operatorOr = Group(
+        generalUnit
+        + Suppress(White())
+        + Suppress(orToken)
+        + Suppress(White())
+        + expression
+    ).setResultsName("Or")
+    operatorAndNot = Group(
+        unit + Suppress(White()) + Suppress(andNotToken) + Suppress(White()) + unit
+    ).setResultsName("AndNot")
 
-    expression << (OneOrMore(operatorAnd | operatorOr | operatorAndNot | generalUnit | Suppress(White())) | Empty())
+    expression << (
+        OneOrMore(
+            operatorAnd | operatorOr | operatorAndNot | generalUnit | Suppress(White())
+        )
+        | Empty()
+    )
 
     toplevel = Group(expression).setResultsName("Toplevel") + StringEnd()
 
     return toplevel.parseString
 
+
 DEFAULT_PARSER = _make_default_parser()
 
 
 # Query parser objects
+
 
 class PyparsingBasedParser(object):
     def _field(self, fieldname):
@@ -147,11 +201,11 @@ class PyparsingBasedParser(object):
 
     def parse(self, input, normalize=True):
         """Parses the input string and returns a Query object/tree.
-        
+
         This method may return None if the input string does not result in any
         valid queries. It may also raise a variety of exceptions if the input
         string is malformed.
-        
+
         :param input: the unicode string to parse.
         :param normalize: whether to call normalize() on the query object/tree
             before returning it. This should be left on unless you're trying to
@@ -199,7 +253,7 @@ class PyparsingBasedParser(object):
 
             texts = list(field.process_text(text, mode="query"))
             if not texts:
-                return self.termclass(fieldname, u'')
+                return self.termclass(fieldname, "")
             elif len(texts) == 1:
                 return self.termclass(fieldname, texts[0])
             else:
@@ -210,26 +264,25 @@ class PyparsingBasedParser(object):
     def make_wildcard(self, fieldname, text):
         field = self._field(fieldname)
         if field:
-            text = self.get_term_text(field, text, tokenize=False,
-                                      removestops=False)
+            text = self.get_term_text(field, text, tokenize=False, removestops=False)
         return Wildcard(fieldname, text)
 
     def make_range(self, fieldname, start, end, startexcl, endexcl):
         field = self._field(fieldname)
         if field:
             if start:
-                start = self.get_term_text(field, start, tokenize=False,
-                                           removestops=False)
+                start = self.get_term_text(
+                    field, start, tokenize=False, removestops=False
+                )
             if end:
-                end = self.get_term_text(field, end, tokenize=False,
-                                         removestops=False)
+                end = self.get_term_text(field, end, tokenize=False, removestops=False)
 
         if not start and not end:
             raise QueryError("TermRange must have start and/or end")
         if not start:
-            start = u''
+            start = ""
         if not end:
-            end = u'\uFFFF'
+            end = "\uffff"
         return TermRange(fieldname, start, end, startexcl, endexcl)
 
     def make_and(self, qs):
@@ -250,12 +303,14 @@ class QueryParser(PyparsingBasedParser):
     language similar to Lucene's.
     """
 
-    __inittypes__ = dict(default_field=str, schema="whoosh.fields.Schema",
-                         conjunction="whoosh.query.Query",
-                         termclass="whoosh.query.Query")
+    __inittypes__ = dict(
+        default_field=str,
+        schema="whoosh.fields.Schema",
+        conjunction="whoosh.query.Query",
+        termclass="whoosh.query.Query",
+    )
 
-    def __init__(self, default_field, schema=None, conjunction=And,
-                 termclass=Term):
+    def __init__(self, default_field, schema=None, conjunction=And, termclass=Term):
         """
         :param default_field: Use this as the field for any terms without
             an explicit field. For example, if the query string is
@@ -313,8 +368,9 @@ class QueryParser(PyparsingBasedParser):
         return self.make_or([self._eval(s, fieldname) for s in node])
 
     def _AndNot(self, node, fieldname):
-        return self.make_andnot(self._eval(node[0], fieldname),
-                                self._eval(node[1], fieldname))
+        return self.make_andnot(
+            self._eval(node[0], fieldname), self._eval(node[1], fieldname)
+        )
 
     def _Not(self, node, fieldname):
         return self.make_not(self._eval(node[0], fieldname))
@@ -340,15 +396,17 @@ class MultifieldParser(QueryParser):
     textual fields (e.g. "title" and "content") you want to search by default.
     """
 
-    __inittypes__ = dict(fieldnames=list, schema="whoosh.fields.Schema",
-                         conjunction="whoosh.query.Query",
-                         termclass="whoosh.query.Query")
+    __inittypes__ = dict(
+        fieldnames=list,
+        schema="whoosh.fields.Schema",
+        conjunction="whoosh.query.Query",
+        termclass="whoosh.query.Query",
+    )
 
-    def __init__(self, fieldnames, schema=None, conjunction=And,
-                 termclass=Term):
-        super(MultifieldParser, self).__init__(None, schema=schema,
-                                               conjunction=conjunction,
-                                               termclass=termclass)
+    def __init__(self, fieldnames, schema=None, conjunction=And, termclass=Term):
+        super(MultifieldParser, self).__init__(
+            None, schema=schema, conjunction=conjunction, termclass=termclass
+        )
         self.fieldnames = fieldnames
 
     def _make(self, methodname, fieldname, *args):
@@ -362,18 +420,10 @@ class MultifieldParser(QueryParser):
         return self._make("make_term", fieldname, text)
 
     def make_range(self, fieldname, start, end, startexcl, endexcl):
-        return self._make("make_range", fieldname, start, end,
-                          startexcl, endexcl)
+        return self._make("make_range", fieldname, start, end, startexcl, endexcl)
 
     def make_wildcard(self, fieldname, text):
         return self._make("make_wildcard", fieldname, text)
 
     def make_phrase(self, fieldname, text):
         return self._make("make_phrase", fieldname, text)
-
-
-
-
-
-
-

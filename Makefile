@@ -39,10 +39,10 @@ INDEX_PATH=$(API_PATH)"alfanous/indexes/"
 
 ## Python version and command
 PYTHON_VERSION_MAJ=$(shell python -c 'import sys; print(sys.version_info[0])')
-ifeq '$(PYTHON_VERSION_MAJ)' '2' 
-PYTHON_COMMAND="python"
+ifeq '$(PYTHON_VERSION_MAJ)' '3' 
+PYTHON_COMMAND="python3"
 else 
-PYTHON_COMMAND="python2"
+PYTHON_COMMAND="python"
 endif
 
 ## default target, it's what to do if you typed "make" without target
