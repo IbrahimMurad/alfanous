@@ -1,38 +1,47 @@
-#===============================================================================
+# ===============================================================================
 # Copyright 2007 Matt Chaput
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #    http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#===============================================================================
+# ===============================================================================
 
 from array import array
 from collections import defaultdict
 
 from alfanous.Support.whoosh.fields import UnknownFieldError
-from alfanous.Support.whoosh.store import LockError
-from alfanous.Support.whoosh.writing import IndexWriter
 from alfanous.Support.whoosh.filedb import postpool
-from alfanous.Support.whoosh.support.filelock import try_for
-from alfanous.Support.whoosh.filedb.fileindex import SegmentDeletionMixin, Segment, SegmentSet
+from alfanous.Support.whoosh.filedb.fileindex import (
+    Segment,
+    SegmentDeletionMixin,
+    SegmentSet,
+)
 from alfanous.Support.whoosh.filedb.filepostings import FilePostingWriter
-from alfanous.Support.whoosh.filedb.filetables import (FileTableWriter, FileListWriter,
-                                      FileRecordWriter, encode_termkey,
-                                      encode_vectorkey, encode_terminfo,
-                                      enpickle, packint)
+from alfanous.Support.whoosh.filedb.filetables import (
+    FileListWriter,
+    FileRecordWriter,
+    FileTableWriter,
+    encode_terminfo,
+    encode_termkey,
+    encode_vectorkey,
+    enpickle,
+    packint,
+)
+from alfanous.Support.whoosh.store import LockError
+from alfanous.Support.whoosh.support.filelock import try_for
 from alfanous.Support.whoosh.util import fib
-
+from alfanous.Support.whoosh.writing import IndexWriter
 
 DOCLENGTH_TYPE = "H"
-DOCLENGTH_LIMIT = 2 ** 16 - 1
+DOCLENGTH_LIMIT = 2**16 - 1
 
 
 # Merge policies
@@ -41,9 +50,9 @@ DOCLENGTH_LIMIT = 2 ** 16 - 1
 # object, and the current SegmentSet (not including the segment being written),
 # and returns an updated SegmentSet (not including the segment being written).
 
+
 def NO_MERGE(ix, writer, segments):
-    """This policy does not merge any existing segments.
-    """
+    """This policy does not merge any existing segments."""
     return segments
 
 
@@ -53,6 +62,7 @@ def MERGE_SMALL(ix, writer, segments):
     """
 
     from alfanous.Support.whoosh.filedb.filereading import SegmentReader
+
     newsegments = SegmentSet()
     sorted_segment_list = sorted((s.doc_count_all(), s) for s in segments)
     total_docs = 0
@@ -67,10 +77,10 @@ def MERGE_SMALL(ix, writer, segments):
 
 
 def OPTIMIZE(ix, writer, segments):
-    """This policy merges all existing segments.
-    """
+    """This policy merges all existing segments."""
 
     from alfanous.Support.whoosh.filedb.filereading import SegmentReader
+
     for seg in segments:
         writer.add_reader(SegmentReader(ix.storage, seg, ix.schema))
     return SegmentSet()
@@ -78,20 +88,23 @@ def OPTIMIZE(ix, writer, segments):
 
 # Convenience functions
 
+
 def create_terms(storage, segment):
     termfile = storage.create_file(segment.term_filename)
-    return FileTableWriter(termfile,
-                           keycoder=encode_termkey,
-                           valuecoder=encode_terminfo)
+    return FileTableWriter(
+        termfile, keycoder=encode_termkey, valuecoder=encode_terminfo
+    )
+
 
 def create_storedfields(storage, segment):
     listfile = storage.create_file(segment.docs_filename)
     return FileListWriter(listfile, valuecoder=enpickle)
 
+
 def create_vectors(storage, segment):
     vectorfile = storage.create_file(segment.vector_filename)
-    return FileTableWriter(vectorfile, keycoder=encode_vectorkey,
-                           valuecoder=packint)
+    return FileTableWriter(vectorfile, keycoder=encode_vectorkey, valuecoder=packint)
+
 
 def create_doclengths(storage, segment, fieldcount):
     recordformat = "!" + DOCLENGTH_TYPE * fieldcount
@@ -101,12 +114,14 @@ def create_doclengths(storage, segment, fieldcount):
 
 # Writing classes
 
+
 class FileIndexWriter(SegmentDeletionMixin, IndexWriter):
     # This class is mostly a shell for SegmentWriter. It exists to handle
     # multiple SegmentWriters during merging/optimizing.
 
-    def __init__(self, ix, postlimit=32 * 1024 * 1024, blocklimit=128,
-                 timeout=0.0, delay=0.1):
+    def __init__(
+        self, ix, postlimit=32 * 1024 * 1024, blocklimit=128, timeout=0.0, delay=0.1
+    ):
         """
         :param ix: the Index object you want to write to.
         :param postlimit: Essentially controls the maximum amount of memory the
@@ -134,12 +149,12 @@ class FileIndexWriter(SegmentDeletionMixin, IndexWriter):
         self._segment_writer = None
 
     def segment_writer(self):
-        """Returns the underlying SegmentWriter object.
-        """
+        """Returns the underlying SegmentWriter object."""
 
         if not self._segment_writer:
-            self._segment_writer = SegmentWriter(self.index, self.postlimit,
-                                                 self.blocklimit)
+            self._segment_writer = SegmentWriter(
+                self.index, self.postlimit, self.blocklimit
+            )
         return self._segment_writer
 
     def add_document(self, **fields):
@@ -147,7 +162,7 @@ class FileIndexWriter(SegmentDeletionMixin, IndexWriter):
 
     def commit(self, mergetype=MERGE_SMALL):
         """Finishes writing and unlocks the index.
-        
+
         :param mergetype: How to merge existing segments. One of
             :class:`whoosh.filedb.filewriting.NO_MERGE`,
             :class:`whoosh.filedb.filewriting.MERGE_SMALL`,
@@ -176,7 +191,7 @@ class FileIndexWriter(SegmentDeletionMixin, IndexWriter):
 class SegmentWriter(object):
     """Do not instantiate this object directly; it is created by the
     IndexWriter object.
-    
+
     Handles the actual writing of new documents to the index: writes stored
     fields, handles the posting pool, and writes out the term index.
     """
@@ -203,12 +218,12 @@ class SegmentWriter(object):
         # with fields (A, B, C, D, E, F). If B, D, and E are scorable, then the
         # list of scorable fields is (B, D, E). The _scorable_to_pos dictionary
         # would then map B -> 0, D -> 1, and E -> 2.
-        self._scorable_to_pos = dict((fnum, i)
-                                     for i, fnum
-                                     in enumerate(self.schema.scorable_fields()))
-        self._stored_to_pos = dict((fnum, i)
-                                   for i, fnum
-                                   in enumerate(self.schema.stored_fields()))
+        self._scorable_to_pos = dict(
+            (fnum, i) for i, fnum in enumerate(self.schema.scorable_fields())
+        )
+        self._stored_to_pos = dict(
+            (fnum, i) for i, fnum in enumerate(self.schema.stored_fields())
+        )
 
         # Create a temporary segment object just so we can access its
         # *_filename attributes (so if we want to change the naming convention,
@@ -218,7 +233,9 @@ class SegmentWriter(object):
         self.docslist = create_storedfields(storage, tempseg)
         self.doclengths = None
         if self.schema.scorable_fields():
-            self.doclengths = create_doclengths(storage, tempseg, len(self._scorable_to_pos))
+            self.doclengths = create_doclengths(
+                storage, tempseg, len(self._scorable_to_pos)
+            )
 
         postfile = storage.create_file(tempseg.posts_filename)
         self.postwriter = FilePostingWriter(postfile, blocklimit=blocklimit)
@@ -261,7 +278,7 @@ class SegmentWriter(object):
     def add_reader(self, reader):
         """Adds the contents of another segment to this one. This is used to
         merge existing segments into the new one before deleting them.
-        
+
         :param ix: The index.Index object containing the segment to merge.
         :param segment: The index.Segment object to merge into this one.
         """
@@ -282,15 +299,13 @@ class SegmentWriter(object):
         # Merge document info
         docnum = 0
         vectored_fieldnums = schema.vectored_fields()
-        for docnum in xrange(reader.doc_count_all()):
+        for docnum in range(reader.doc_count_all()):
             if not reader.is_deleted(docnum):
                 # Copy the stored fields and field lengths from the reader
                 # into this segment
                 storeditems = reader.stored_fields(docnum).items()
-                storedvalues = [v for k, v
-                                in sorted(storeditems, key=storedkeyhelper)]
-                self._add_doc_data(storedvalues,
-                                   reader.doc_field_lengths(docnum))
+                storedvalues = [v for k, v in sorted(storeditems, key=storedkeyhelper)]
+                self._add_doc_data(storedvalues, reader.doc_field_lengths(docnum))
 
                 if has_deletions:
                     doc_map[docnum] = self.max_doc
@@ -298,8 +313,9 @@ class SegmentWriter(object):
                 # Copy term vectors
                 for fieldnum in vectored_fieldnums:
                     if reader.has_vector(docnum, fieldnum):
-                        self._add_vector(fieldnum,
-                                         reader.vector(docnum, fieldnum).items())
+                        self._add_vector(
+                            fieldnum, reader.vector(docnum, fieldnum).items()
+                        )
 
                 self.max_doc += 1
 
@@ -332,8 +348,7 @@ class SegmentWriter(object):
         schema = self.schema
 
         # Sort the keys by their order in the schema
-        fieldnames = [name for name in fields.keys()
-                      if not name.startswith("_")]
+        fieldnames = [name for name in fields.keys() if not name.startswith("_")]
         fieldnames.sort(key=schema.name_to_number)
 
         # Check if the caller gave us a bogus field
@@ -368,9 +383,10 @@ class SegmentWriter(object):
                     # TODO: Method for adding progressive field values, ie
                     # setting start_pos/start_char?
                     for w, freq, valuestring in field.index(value):
-                        #assert w != ""
-                        self.pool.add_posting(fieldnum, w, self.max_doc, freq,
-                                              valuestring)
+                        # assert w != ""
+                        self.pool.add_posting(
+                            fieldnum, w, self.max_doc, freq, valuestring
+                        )
                         count += freq
                         unique += 1
 
@@ -387,8 +403,12 @@ class SegmentWriter(object):
                 if vector:
                     # TODO: Method for adding progressive field values, ie
                     # setting start_pos/start_char?
-                    vlist = sorted((w, valuestring) for w, freq, valuestring
-                                   in vector.word_values(value, mode="index"))
+                    vlist = sorted(
+                        (w, valuestring)
+                        for w, freq, valuestring in vector.word_values(
+                            value, mode="index"
+                        )
+                    )
                     self._add_vector(fieldnum, vlist)
 
                 # If the field is stored, put the value in storedvalues
@@ -398,7 +418,7 @@ class SegmentWriter(object):
                     storedname = "_stored_" + name
                     if storedname in fields:
                         stored_value = fields[storedname]
-                    else :
+                    else:
                         stored_value = value
 
                     storedvalues[stored_to_pos[fieldnum]] = stored_value
@@ -420,7 +440,7 @@ class SegmentWriter(object):
 
         offset = vpostwriter.start(vformat)
         for text, valuestring in vlist:
-            assert isinstance(text, unicode), "%r is not unicode" % text
+            assert isinstance(text, str), "%r is not str" % text
             vpostwriter.write(text, valuestring)
         vpostwriter.finish()
 
@@ -438,8 +458,8 @@ class SegmentWriter(object):
         postwriter = self.postwriter
         schema = self.schema
 
-        current_fieldnum = None # Field number of the current term
-        current_text = None # Text of the current term
+        current_fieldnum = None  # Field number of the current term
+        current_text = None  # Text of the current term
         first = True
         current_freq = 0
         offset = None
@@ -455,20 +475,30 @@ class SegmentWriter(object):
                     # This is a new term, so finish the postings and add the
                     # term to the term table
                     postcount = postwriter.finish()
-                    termtable.add((current_fieldnum, current_text),
-                                  (current_freq, offset, postcount))
+                    termtable.add(
+                        (current_fieldnum, current_text),
+                        (current_freq, offset, postcount),
+                    )
 
                 # Reset the post writer and the term variables
                 current_fieldnum = fieldnum
                 current_text = text
                 current_freq = 0
-                offset = postwriter.start(schema[fieldnum].format)
+                try:
+                    offset = postwriter.start(schema[fieldnum].format)
+                except IndexError as e:
+                    print("ERROR: Field number %d is out of range for schema with %d fields" % (fieldnum, len(schema)))
+                    print("Schema field names: %s" % schema.field_names())
+                    raise e
 
-            elif (fieldnum < current_fieldnum
-                  or (fieldnum == current_fieldnum and text < current_text)):
+            elif fieldnum < current_fieldnum or (
+                fieldnum == current_fieldnum and text < current_text
+            ):
                 # This should never happen!
-                raise Exception("Postings are out of order: %s:%s .. %s:%s" %
-                                (current_fieldnum, current_text, fieldnum, text))
+                raise Exception(
+                    "Postings are out of order: %s:%s .. %s:%s"
+                    % (current_fieldnum, current_text, fieldnum, text)
+                )
 
             # Write a posting for this occurrence of the current term
             current_freq += freq
@@ -477,11 +507,6 @@ class SegmentWriter(object):
         # If there are still "uncommitted" postings at the end, finish them off
         if not first:
             postcount = postwriter.finish()
-            termtable.add((current_fieldnum, current_text),
-                          (current_freq, offset, postcount))
-
-
-
-
-
-
+            termtable.add(
+                (current_fieldnum, current_text), (current_freq, offset, postcount)
+            )

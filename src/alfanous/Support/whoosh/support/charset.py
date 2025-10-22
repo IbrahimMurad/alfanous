@@ -5,9 +5,8 @@ are useful for doing case and accent folding.
 See :class:`whoosh.analysis.CharsetTokenizer` and :class:`whoosh.analysis.CharsetFilter`.
 """
 
-from collections import defaultdict
-from itertools import izip
 import re
+from collections import defaultdict
 
 # This charset table taken from http://speeple.com/unicode-maps.txt
 default_charset = """
@@ -532,32 +531,35 @@ U+FF10..U+FF19->0..9, U+FF21..U+FF3A->a..z, U+FF41..U+FF5A->a..z, 0..9, A..Z->a.
 #
 # A->a
 #     Single char mapping, declares source char 'A' as allowed to occur within keywords
-#     and maps it to destination char 'a' (but does not declare 'a' as allowed). 
+#     and maps it to destination char 'a' (but does not declare 'a' as allowed).
 # A..Z->a..z
 #     Range mapping, declares all chars in source range as allowed and maps them to
 #     the destination range. Does not declare destination range as allowed. Also checks
-#     ranges' lengths (the lengths must be equal). 
+#     ranges' lengths (the lengths must be equal).
 # a
 #     Stray char mapping, declares a character as allowed and maps it to itself.
-#     Equivalent to a->a single char mapping. 
+#     Equivalent to a->a single char mapping.
 # a..z
 #     Stray range mapping, declares all characters in range as allowed and maps them to
-#     themselves. Equivalent to a..z->a..z range mapping. 
+#     themselves. Equivalent to a..z->a..z range mapping.
 # A..Z/2
 #     Checkerboard range map. Maps every pair of chars to the second char.
 #     More formally, declares odd characters in range as allowed and maps them to the
 #     even ones; also declares even characters as allowed and maps them to themselves.
 #     For instance, A..Z/2 is equivalent to A->B, B->B, C->D, D->D, ..., Y->Z, Z->Z.
 #     This mapping shortcut is helpful for a number of Unicode blocks where uppercase
-#     and lowercase letters go in such interleaved order instead of contiguous chunks. 
+#     and lowercase letters go in such interleaved order instead of contiguous chunks.
 
 _dewhite = re.compile(r"\s")
 _char = r"((?:U\+[0-9A-Fa-f]{4,6})|.)"
 _char_map = re.compile("^" + _char + "->" + _char + "$")
-_range_map = re.compile("^" + _char + r"\.\." + _char + "->" + _char + ".." + _char + "$")
+_range_map = re.compile(
+    "^" + _char + r"\.\." + _char + "->" + _char + ".." + _char + "$"
+)
 _stray_char = re.compile("^" + _char + "$")
 _stray_range = re.compile("^" + _char + r"\.\." + _char + "$")
 _checker_range = re.compile("^" + _char + r"\.\." + _char + "/2$")
+
 
 def charspec_to_int(string):
     # Converts a character specification of the form 'A' or 'U+23BC'
@@ -569,23 +571,26 @@ def charspec_to_int(string):
     else:
         raise Exception("Can't convert charspec: %r" % string)
 
+
 def charset_table_to_dict(tablestring):
     """Takes a string with the contents of a Sphinx charset table file and
     returns a mapping object (a defaultdict, actually) of the kind expected by
     the unicode.translate() method: that is, it maps a character number to a unicode
     character or None if the character is not a valid word character.
-    
+
     The Sphinx charset table format is described at
     http://www.sphinxsearch.com/docs/current.html#conf-charset-table.
     """
-    
-    #map = {}
+
+    # map = {}
     map = defaultdict(lambda: None)
     for line in tablestring.split("\n"):
-        if not line or line.startswith("#"): continue
+        if not line or line.startswith("#"):
+            continue
         line = _dewhite.sub("", line)
         for item in line.split(","):
-            if not item: continue
+            if not item:
+                continue
             match = _range_map.match(item)
             if match:
                 start1 = charspec_to_int(match.group(1))
@@ -594,70 +599,56 @@ def charset_table_to_dict(tablestring):
                 end2 = charspec_to_int(match.group(4))
                 assert (end1 - start1) == (end2 - start2)
                 try:
-                    for fromord, tooord in izip(xrange(start1, end1+1), xrange(start2, end2+1)):
-                        map[fromord] = unichr(tooord)
+                    for fromord, tooord in zip(
+                        range(start1, end1 + 1), range(start2, end2 + 1)
+                    ):
+                        map[fromord] = chr(tooord)
                 except ValueError:
                     pass
                 continue
-            
+
             match = _char_map.match(item)
             if match:
                 fromord = charspec_to_int(match.group(1))
                 toord = charspec_to_int(match.group(2))
                 try:
-                    map[fromord] = unichr(toord)
+                    map[fromord] = chr(toord)
                 except ValueError:
                     pass
                 continue
-            
+
             match = _stray_char.match(item)
             if match:
                 ord = charspec_to_int(match.group(0))
                 try:
-                    map[ord] = unichr(ord)
+                    map[ord] = chr(ord)
                 except ValueError:
                     pass
                 continue
-            
+
             match = _stray_range.match(item)
             if match:
                 start = charspec_to_int(match.group(1))
                 end = charspec_to_int(match.group(2))
                 try:
-                    for ord in xrange(start, end+1):
-                            map[ord] = unichr(ord)
+                    for ord in range(start, end + 1):
+                        map[ord] = chr(ord)
                 except ValueError:
                     pass
                 continue
-                    
+
             match = _checker_range.match(item)
             if match:
                 fromord = charspec_to_int(match.group(1))
                 toord = charspec_to_int(match.group(2))
-                assert toord-fromord % 2 == 0
-                for ord in xrange(fromord, toord + 1, 2):
+                assert toord - fromord % 2 == 0
+                for ord in range(fromord, toord + 1, 2):
                     try:
-                        map[ord] = unichr(ord+1)
-                        map[ord+1] = unichr(ord+1)
+                        map[ord] = chr(ord + 1)
+                        map[ord + 1] = chr(ord + 1)
                     except ValueError:
                         pass
                 continue
-            
+
             raise Exception("Don't know what to do with %r" % item)
     return map
-
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -1,25 +1,24 @@
-#===============================================================================
+# ===============================================================================
 # Copyright 2009 Matt Chaput
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #    http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#===============================================================================
+# ===============================================================================
 
-import codecs
 from array import array
 
-from alfanous.Support.whoosh.postings import PostingWriter, PostingReader, ReadTooFar
+from alfanous.Support.whoosh.postings import PostingReader, PostingWriter, ReadTooFar
 from alfanous.Support.whoosh.system import _INT_SIZE
-from alfanous.Support.whoosh.util import utf8encode, utf8decode
+from alfanous.Support.whoosh.util import utf8decode, utf8encode
 
 
 class FilePostingWriter(PostingWriter):
@@ -90,7 +89,10 @@ class FilePostingWriter(PostingWriter):
             pf.write_array(lengths)
 
         if posting_size != 0:
-            pf.write("".join(values))
+            if isinstance(values[0], str):
+                pf.write("".join(values).encode('utf-8'))
+            else:
+                pf.write(bytes().join(values))
 
         # Seek back and write the pointer to the next block
         pf.flush()
@@ -132,7 +134,6 @@ class FilePostingWriter(PostingWriter):
         self.postfile.close()
 
 
-
 class FilePostingReader(PostingReader):
     def __init__(self, postfile, offset, format, stringids=False):
         self.postfile = postfile
@@ -156,7 +157,7 @@ class FilePostingReader(PostingReader):
 
     def all_items(self):
         nextoffset = self.baseoffset
-        for _ in xrange(self.blockcount):
+        for _ in range(self.blockcount):
             maxid, nextoffset, postcount, offset = self._read_block_header(nextoffset)
             ids, offset = self._read_ids(offset, postcount)
             values = self._read_values(offset, nextoffset, postcount)
@@ -165,7 +166,7 @@ class FilePostingReader(PostingReader):
 
     def all_ids(self):
         nextoffset = self.baseoffset
-        for _ in xrange(self.blockcount):
+        for _ in range(self.blockcount):
             maxid, nextoffset, postcount, offset = self._read_block_header(nextoffset)
             ids, offset = self._read_ids(offset, postcount)
             for id in ids:
@@ -226,7 +227,7 @@ class FilePostingReader(PostingReader):
         if self.stringids:
             pf.seek(offset)
             rs = pf.read_string
-            ids = [utf8decode(rs())[0] for _ in xrange(postcount)]
+            ids = [utf8decode(rs())[0] for _ in range(postcount)]
             offset = pf.tell()
         else:
             ids = pf.get_array(offset, "I", postcount)
@@ -251,20 +252,22 @@ class FilePostingReader(PostingReader):
             if posting_size > 0:
                 # Format has a fixed posting size, just chop up the values
                 # equally
-                values = [allvalues[i * posting_size: i * posting_size + posting_size]
-                          for i in xrange(postcount)]
+                values = [
+                    allvalues[i * posting_size : i * posting_size + posting_size]
+                    for i in range(postcount)
+                ]
             else:
                 # Format has a variable posting size, use the array of lengths
                 # to chop up the values.
                 pos = 0
                 values = []
                 for length in lengths:
-                    values.append(allvalues[pos:pos + length])
+                    values.append(allvalues[pos : pos + length])
                     pos += length
         else:
             # Format does not store values (i.e. Existence), just create fake
             # values
-            values = ('',) * postcount
+            values = ("",) * postcount
 
         return values
 
@@ -282,7 +285,9 @@ class FilePostingReader(PostingReader):
             self.id = None
             return
 
-        self.maxid, self.nextoffset, self.postcount, offset = self._read_block_header(self.nextoffset)
+        self.maxid, self.nextoffset, self.postcount, offset = self._read_block_header(
+            self.nextoffset
+        )
 
         self.currentblock += 1
         self._consume_block(offset)
@@ -312,16 +317,3 @@ class FilePostingReader(PostingReader):
         self.postcount = postcount
 
         self._consume_block(offset)
-
-
-
-
-
-
-
-
-
-
-
-
-

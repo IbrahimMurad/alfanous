@@ -1,32 +1,35 @@
-
-#===============================================================================
+# ===============================================================================
 # Copyright 2007 Matt Chaput
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #    http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#===============================================================================
+# ===============================================================================
 
 """Support functions and classes implementing the KinoSearch-like external sort
 merging model. This module does not contain any user-level objects.
 """
 
-import os, tempfile
-from heapq import heapify, heapreplace, heappop
+import os
+import tempfile
+from heapq import heapify, heappop, heapreplace
 from struct import Struct
 
-from alfanous.Support.whoosh.filedb.structfile import StructFile, pack_ushort, unpack_ushort
+from alfanous.Support.whoosh.filedb.structfile import (
+    StructFile,
+    pack_ushort,
+    unpack_ushort,
+)
 from alfanous.Support.whoosh.system import _INT_SIZE, _USHORT_SIZE
-from alfanous.Support.whoosh.util import utf8encode, utf8decode
-
+from alfanous.Support.whoosh.util import utf8decode, utf8encode
 
 # Utility functions
 
@@ -34,16 +37,18 @@ _2int_struct = Struct("!II")
 pack2ints = _2int_struct.pack
 unpack2ints = _2int_struct.unpack
 
-def encode_posting(fieldnum, text, doc, freq, datastring):
-    """Encodes a posting as a string, for sorting.
-    """
 
-    return "".join([pack_ushort(fieldnum),
-                    utf8encode(text)[0],
-                    chr(0),
-                    pack2ints(doc, freq),
-                    datastring
-                    ])
+def encode_posting(fieldnum, text, doc, freq, datastring):
+    """Encodes a posting as a string, for sorting."""
+
+    return b"".join([
+        pack_ushort(fieldnum),
+        utf8encode(text)[0],
+        b'\x00',
+        pack2ints(doc, freq),
+        datastring.encode('utf-8') if isinstance(datastring, str) else datastring,
+    ])
+
 
 def decode_posting(posting):
     """Decodes an encoded posting string into a
@@ -52,16 +57,17 @@ def decode_posting(posting):
 
     fieldnum = unpack_ushort(posting[:_USHORT_SIZE])[0]
 
-    zero = posting.find(chr(0), _USHORT_SIZE)
+    zero = posting.find(b'\x00', _USHORT_SIZE)
     text = utf8decode(posting[_USHORT_SIZE:zero])[0]
 
     metastart = zero + 1
     metaend = metastart + _INT_SIZE * 2
     doc, freq = unpack2ints(posting[metastart:metaend])
 
-    datastring = posting[metaend:]
+    datastring = posting[metaend:].decode('utf-8')
 
     return fieldnum, text, doc, freq, datastring
+
 
 def merge(run_readers, max_chunk_size):
     # Initialize a list of terms we're "current"ly looking at, by taking the
@@ -72,8 +78,7 @@ def merge(run_readers, max_chunk_size):
     # The list is sorted, and the runs are already sorted, so the first term in
     # this list should be the absolute "lowest" term.
 
-    current = [(r.next(), i) for i, r
-               in enumerate(run_readers)]
+    current = [(r.next(), i) for i, r in enumerate(run_readers)]
     heapify(current)
 
     # The number of active readers (readers with more postings to available),
@@ -135,6 +140,7 @@ def merge(run_readers, max_chunk_size):
 
 
 # Classes
+
 
 class RunReader(object):
     """An iterator that yields posting strings from a "run" on disk.
@@ -231,14 +237,13 @@ class PostingPool(object):
         self.count = 0
 
     def add_posting(self, field_num, text, doc, freq, datastring):
-        """Adds a posting to the pool.
-        """
+        """Adds a posting to the pool."""
 
         if self.finished:
             raise Exception("Can't add postings after you iterate over the pool")
 
         if self.size >= self.limit:
-            #print "Flushing..."
+            # print "Flushing..."
             self._flush_run()
 
         posting = encode_posting(field_num, text, doc, freq, datastring)
@@ -262,7 +267,7 @@ class PostingPool(object):
 
             self.runs.append((runfile, self.count))
             self.tempfilenames.append(tempname)
-            #print "Flushed run:", self.runs
+            # print "Flushed run:", self.runs
 
             self.postings = []
             self.size = 0
@@ -295,15 +300,16 @@ class PostingPool(object):
             self._flush_run()
             run_count = len(self.runs)
 
-        #This method does an external merge to yield postings from the (n > 1)
-        #runs built up during indexing and merging.
+        # This method does an external merge to yield postings from the (n > 1)
+        # runs built up during indexing and merging.
 
         # Divide up the posting pool's memory limit between the number of runs
         # plus an output buffer.
         max_chunk_size = int(self.limit / (run_count + 1))
 
-        run_readers = [RunReader(run_file, count, max_chunk_size)
-                       for run_file, count in self.runs]
+        run_readers = [
+            RunReader(run_file, count, max_chunk_size) for run_file, count in self.runs
+        ]
 
         for decoded_posting in merge(run_readers, max_chunk_size):
             yield decoded_posting
@@ -311,15 +317,9 @@ class PostingPool(object):
         for rr in run_readers:
             assert rr.count == 0
             rr.close()
-            
+
         for tempfilename in self.tempfilenames:
             os.remove(tempfilename)
-            
+
         # And we're done.
         self.finished = True
-
-
-
-
-
-

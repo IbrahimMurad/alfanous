@@ -1,6 +1,7 @@
 #!/usr/bin/env python2
 # coding: utf-8
 
+# ruff: noqa: F403, F405, F821
 
 from optparse import OptionGroup, OptionParser
 

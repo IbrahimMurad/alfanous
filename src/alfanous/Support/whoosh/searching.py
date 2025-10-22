@@ -1,39 +1,40 @@
-#===============================================================================
+# ===============================================================================
 # Copyright 2007 Matt Chaput
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #    http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#===============================================================================
+# ===============================================================================
 
-"""This module contains classes and functions related to searching the index.
-"""
-
+"""This module contains classes and functions related to searching the index."""
 
 from __future__ import division
+
+import sys
+import time
 from heapq import heappush, heapreplace
 from math import log
-import sys, time
 
 from alfanous.Support.whoosh import classify, query, scoring
-from alfanous.Support.whoosh.scoring import Sorter, FieldSorter
+from alfanous.Support.whoosh.scoring import FieldSorter, Sorter
 from alfanous.Support.whoosh.support.bitvector import BitVector
 
-if sys.platform == 'win32':
+if sys.platform == "win32":
     now = time.clock
 else:
     now = time.time
 
 
 # Searcher class
+
 
 class Searcher(object):
     """Wraps an :class:`~whoosh.reading.IndexReader` object and provides
@@ -51,8 +52,7 @@ class Searcher(object):
         self.ixreader = ixreader
 
         # Copy attributes/methods from wrapped reader
-        for name in ("stored_fields", "postings", "vector", "vector_as",
-                     "schema"):
+        for name in ("stored_fields", "postings", "vector", "vector_as", "schema"):
             setattr(self, name, getattr(ixreader, name))
 
         if type(weighting) is type:
@@ -63,7 +63,7 @@ class Searcher(object):
         self.is_closed = False
         self._idf_cache = {}
 
-    #def __del__(self):
+    # def __del__(self):
     #    if hasattr(self, "is_closed") and not self.is_closed:
     #        self.close()
 
@@ -83,7 +83,8 @@ class Searcher(object):
         fieldnum = self.fieldname_to_num(fieldid)
         cache = self._idf_cache
         term = (fieldnum, text)
-        if term in cache: return cache[term]
+        if term in cache:
+            return cache[term]
 
         df = self.ixreader.doc_frequency(fieldnum, text)
         idf = log(self.ixreader.doc_count_all() / (df + 1)) + 1.0
@@ -94,16 +95,16 @@ class Searcher(object):
         """Convenience method returns the stored fields of a document
         matching the given keyword arguments, where the keyword keys are
         field names and the values are terms that must appear in the field.
-        
+
         This method is equivalent to::
-        
+
             searcher.stored_fields(searcher.document_number(<keyword args>))
-        
+
         Where Searcher.documents() returns a generator, this function returns
         either a dictionary or None. Use it when you assume the given keyword
         arguments either match zero or one documents (i.e. at least one of the
         fields is a unique key).
-        
+
         >>> stored_fields = searcher.document(path=u"/a/b")
         >>> if stored_fields:
         ...   print stored_fields['title']
@@ -118,29 +119,31 @@ class Searcher(object):
         """Convenience method returns the stored fields of a document
         matching the given keyword arguments, where the keyword keys are
         field names and the values are terms that must appear in the field.
-        
+
         Returns a generator of dictionaries containing the
         stored fields of any documents matching the keyword arguments.
-        
+
         >>> for stored_fields in searcher.documents(emailto=u"matt@whoosh.ca"):
         ...   print "Email subject:", stored_fields['subject']
         """
 
         ixreader = self.ixreader
-        return (ixreader.stored_fields(docnum) for docnum in self.document_numbers(**kw))
+        return (
+            ixreader.stored_fields(docnum) for docnum in self.document_numbers(**kw)
+        )
 
     def document_number(self, **kw):
         """Returns the document number of the document matching the given
         keyword arguments, where the keyword keys are field names and the
         values are terms that must appear in the field.
-        
+
         >>> docnum = searcher.document_number(path=u"/a/b")
-        
+
         Where Searcher.document_numbers() returns a generator, this function
         returns either an int or None. Use it when you assume the given keyword
         arguments either match zero or one documents (i.e. at least one of the
         fields is a unique key).
-        
+
         :rtype: int
         """
 
@@ -151,7 +154,7 @@ class Searcher(object):
         """Returns a generator of the document numbers for documents matching
         the given keyword arguments, where the keyword keys are field names and
         the values are terms that must appear in the field.
-        
+
         >>> docnums = list(searcher.document_numbers(emailto=u"matt@whoosh.ca"))
         """
 
@@ -160,19 +163,20 @@ class Searcher(object):
         if q:
             return q.docs(self)
 
-    def key_terms(self, docnums, fieldname, numterms=5,
-                  model=classify.Bo1Model, normalize=True):
+    def key_terms(
+        self, docnums, fieldname, numterms=5, model=classify.Bo1Model, normalize=True
+    ):
         """Returns the 'numterms' most important terms from the documents
         listed (by number) in 'docnums'. You can get document numbers for the
         documents your interested in with the document_number() and
         document_numbers() methods.
-        
+
         >>> docnum = searcher.document_number(path=u"/a/b")
         >>> keywords = list(searcher.key_terms([docnum], "content"))
-        
+
         "Most important" is generally defined as terms that occur frequently in
         the top hits but relatively infrequently in the collection as a whole.
-        
+
         :param fieldname: Look at the terms in this field. This field must
             store vectors.
         :param docnums: A sequence of document numbers specifying which
@@ -196,6 +200,7 @@ class Searcher(object):
 
     def find(self, defaultfield, querystring, **kwargs):
         from alfanous.Support.whoosh.qparser import QueryParser
+
         qp = QueryParser(defaultfield, schema=self.ixreader.schema)
         q = qp.parse(querystring)
         return self.search(q, **kwargs)
@@ -203,7 +208,7 @@ class Searcher(object):
     def search(self, query, limit=5000, sortedby=None, reverse=False, minscore=0.0001):
         """Runs the query represented by the ``query`` object and returns a
         Results object.
-        
+
         :param query: a :class:`whoosh.query.Query` object.
         :param limit: the maximum number of documents to score. If you're only
             interested in the top N documents, you can set limit=N to limit the
@@ -214,35 +219,35 @@ class Searcher(object):
             tuple, it is assumed to be a sequence of strings and the results
             are sorted by the fieldnames in the sequence. Otherwise 'sortedby'
             should be a scoring.Sorter object.
-            
+
             The fields you want to sort by must be indexed.
-            
+
             For example, to sort the results by the 'path' field::
-            
+
                 searcher.find(q, sortedby = "path")
-                
+
             To sort the results by the 'path' field and then the 'category'
             field::
-                
+
                 searcher.find(q, sortedby = ("path", "category"))
-                
+
             To use a sorting object::
-            
+
                 searcher.find(q, sortedby = scoring.FieldSorter("path", key=mykeyfn))
-            
+
             Using a string or tuple simply instantiates a
             :class:`whoosh.scoring.FieldSorter` or
             :class:`whoosh.scoring.MultiFieldSorter` object for you. To get a
             custom sort order, instantiate your own ``FieldSorter`` with a
             ``key`` argument, or write a custom :class:`whoosh.scoring.Sorter`
             class.
-            
+
             FieldSorter and MultiFieldSorter cache the document order, using 4
             bytes times the number of documents in the index, and taking time
             to cache. To increase performance, instantiate your own sorter and
             re-use it (but remember you need to recreate it if the index
             changes).
-        
+
         :param reverse: if ``sortedby`` is not None, this reverses the
             direction of the sort.
         :param minscore: the minimum score to include in the results.
@@ -253,15 +258,17 @@ class Searcher(object):
 
         t = now()
         if sortedby is not None:
-            if isinstance(sortedby, basestring):
+            if isinstance(sortedby, str):
                 sorter = scoring.FieldSorter(sortedby)
             elif isinstance(sortedby, (list, tuple)):
-                sorter = scoring.MultiFieldSorter([FieldSorter(fn)
-                                                   for fn in sortedby])
+                sorter = scoring.MultiFieldSorter([FieldSorter(fn) for fn in sortedby])
             elif isinstance(sortedby, Sorter):
                 sorter = sortedby
             else:
-                raise ValueError("sortedby argument must be a string, list, or Sorter (%r)" % sortedby)
+                raise ValueError(
+                    "sortedby argument must be a string, list, or Sorter (%r)"
+                    % sortedby
+                )
 
             scored_list = sorter.order(self, query.docs(self), reverse=reverse)
             scores = None
@@ -272,9 +279,13 @@ class Searcher(object):
             # Sort by scores
             topdocs = TopDocs(limit, ixreader.doc_count_all())
             final = self.weighting.final
-            topdocs.add_all(((docnum, final(self, docnum, score))
-                             for docnum, score in query.doc_scores(self)),
-                             minscore)
+            topdocs.add_all(
+                (
+                    (docnum, final(self, docnum, score))
+                    for docnum, score in query.doc_scores(self)
+                ),
+                minscore,
+            )
 
             best = topdocs.best()
             if best:
@@ -289,17 +300,14 @@ class Searcher(object):
             docvector = topdocs.docs
         t = now() - t
 
-        return Results(self, query, scored_list, docvector, runtime=t,
-                       scores=scores)
+        return Results(self, query, scored_list, docvector, runtime=t, scores=scores)
 
     def fieldname_to_num(self, fieldid):
-        """Returns the field number of the given field name.
-        """
+        """Returns the field number of the given field name."""
         return self.schema.to_number(fieldid)
 
     def fieldnum_to_name(self, fieldnum):
-        """Returns the field name corresponding to the given field number.
-        """
+        """Returns the field name corresponding to the given field number."""
         return self.schema.number_to_name(fieldnum)
 
     def field(self, fieldid):
@@ -315,7 +323,7 @@ class TopDocs(object):
     you don't have to sort most of the values (once the object reaches capacity
     and the next item to consider has a lower score than the lowest item in the
     collection, you can just throw it away).
-    
+
     The reason we use this instead of heapq.nlargest is this object keeps
     track of all docnums that were added, even if they're not in the "top N".
     """
@@ -330,8 +338,7 @@ class TopDocs(object):
         return len(self.sorted)
 
     def add_all(self, sequence, minscore):
-        """Adds a sequence of (item, score) pairs.
-        """
+        """Adds a sequence of (item, score) pairs."""
 
         heap = self.heap
         docs = self.docs
@@ -339,7 +346,8 @@ class TopDocs(object):
 
         subtotal = 0
         for docnum, score in sequence:
-            if score < minscore: continue
+            if score < minscore:
+                continue
 
             docs.set(docnum)
             subtotal += 1
@@ -355,8 +363,7 @@ class TopDocs(object):
         self._total += subtotal
 
     def total(self):
-        """Returns the total number of documents added so far.
-        """
+        """Returns the total number of documents added so far."""
 
         return self._total
 
@@ -377,8 +384,7 @@ class Results(object):
     that position in the results.
     """
 
-    def __init__(self, searcher, query, scored_list, docvector,
-                 scores=None, runtime=0):
+    def __init__(self, searcher, query, scored_list, docvector, scores=None, runtime=0):
         """
         :param searcher: the :class:`Searcher` object that produced these
             results.
@@ -402,9 +408,12 @@ class Results(object):
         self.runtime = runtime
 
     def __repr__(self):
-        return "<%s/%s Results for %r runtime=%s>" % (len(self), self.docs.count(),
-                                                      self.query,
-                                                      self.runtime)
+        return "<%s/%s Results for %r runtime=%s>" % (
+            len(self),
+            self.docs.count(),
+            self.query,
+            self.runtime,
+        )
 
     def __len__(self):
         """Returns the TOTAL number of documents found by this search. Note
@@ -420,8 +429,7 @@ class Results(object):
             return stored_fields(self.scored_list[n])
 
     def __iter__(self):
-        """Yields the stored fields of each result document in ranked order.
-        """
+        """Yields the stored fields of each result document in ranked order."""
         stored_fields = self.searcher.stored_fields
         for docnum in self.scored_list:
             yield stored_fields(docnum)
@@ -436,8 +444,7 @@ class Results(object):
         return self.docs.count()
 
     def copy(self):
-        """Returns a copy of this results object.
-        """
+        """Returns a copy of this results object."""
 
         # Scores might be None, so only copy if it if it's a list
         scores = self.scores
@@ -449,10 +456,14 @@ class Results(object):
         if isinstance(scored_list, list):
             scored_list = scored_list[:]
 
-        return self.__class__(self.searcher, self.query,
-                              scored_list=scored_list,
-                              docvector=self.docs.copy(),
-                              scores=scores, runtime=self.runtime)
+        return self.__class__(
+            self.searcher,
+            self.query,
+            scored_list=scored_list,
+            docvector=self.docs.copy(),
+            scores=scores,
+            runtime=self.runtime,
+        )
 
     def score(self, n):
         """Returns the score for the document at the Nth position in the list
@@ -479,13 +490,14 @@ class Results(object):
         """
         return self.scored_list[n]
 
-    def key_terms(self, fieldname, docs=10, numterms=5,
-                  model=classify.Bo1Model, normalize=True):
+    def key_terms(
+        self, fieldname, docs=10, numterms=5, model=classify.Bo1Model, normalize=True
+    ):
         """Returns the 'numterms' most important terms from the top 'numdocs'
         documents in these results. "Most important" is generally defined as
         terms that occur frequently in the top hits but relatively infrequently
         in the collection as a whole.
-        
+
         :param fieldname: Look at the terms in this field. This field must
             store vectors.
         :param docs: Look at this many of the top documents of the results.
@@ -496,7 +508,8 @@ class Results(object):
         """
 
         docs = min(docs, self.scored_length())
-        if docs <= 0: return
+        if docs <= 0:
+            return
 
         reader = self.searcher.reader()
         fieldnum = self.searcher.fieldname_to_num(fieldname)
@@ -510,24 +523,23 @@ class Results(object):
     def extend(self, results):
         """Appends hits from 'results' (that are not already in this
         results object) to the end of these results.
-        
+
         :param results: another results object.
         """
 
         docs = self.docs
-        self.scored_list.extend(docnum for docnum in results.scored_list
-                                if docnum not in docs)
+        self.scored_list.extend(
+            docnum for docnum in results.scored_list if docnum not in docs
+        )
         self.docs = docs | results.docs
 
         # TODO: merge the query terms?
 
     def filter(self, results):
-        """Removes any hits that are not also in the other results object.
-        """
+        """Removes any hits that are not also in the other results object."""
 
         docs = self.docs & results.docs
-        self.scored_list = [docnum for docnum in self.scored_list
-                            if docnum in docs]
+        self.scored_list = [docnum for docnum in self.scored_list if docnum in docs]
         self.docs = docs
 
     def upgrade(self, results, reverse=False):
@@ -535,7 +547,7 @@ class Results(object):
         before hits not in 'results', otherwise keeping their current relative
         positions. This does not add the documents in the other results object
         to this one.
-        
+
         :param results: another results object.
         :param reverse: if True, lower the position of hits in the other
             results object instead of raising them.
@@ -555,7 +567,7 @@ class Results(object):
         """Combines the effects of extend() and increase(): hits that are also
         in 'results' are raised. Then any hits from 'results' that are not in
         this results object are appended to the end of these results.
-        
+
         :param results: another results object.
         """
 
@@ -577,28 +589,28 @@ class ResultsPage(object):
     interface of the :class:`~whoosh.searching.Results` object, namely getting
     stored fields with __getitem__ (square brackets), iterating, and the
     ``score()`` and ``docnum()`` methods.
-    
+
     The ``offset`` attribute contains the results number this page starts at
     (numbered from 0). For example, if the page length is 10, the ``offset``
     attribute on the second page will be ``10``.
-    
+
     The ``pagecount`` attribute contains the number of pages available.
-    
+
     The ``pagenum`` attribute contains the page number. This may be less than
     the page you requested if the results had too few pages. For example, if
     you do::
-    
+
         ResultsPage(results, 5)
-        
+
     but the results object only contains 3 pages worth of hits, ``pagenum``
     will be 3.
-    
+
     The ``pagelen`` attribute contains the number of results on this page
     (which may be less than the page length you requested if this is the last
     page of the results).
-    
+
     The ``total`` attribute contains the total number of hits in the results.
-    
+
     >>> mysearcher = myindex.searcher()
     >>> pagenum = 2
     >>> page = mysearcher.find_page(pagenum, myquery)
@@ -643,8 +655,7 @@ class ResultsPage(object):
         return self.results.iterslice(offset, offset + pagelen)
 
     def score(self, n):
-        """Returns the score of the hit at the nth position on this page.
-        """
+        """Returns the score of the hit at the nth position on this page."""
         return self.results.score(n + self.offset)
 
     def docnum(self, n):
@@ -654,11 +665,5 @@ class ResultsPage(object):
         return self.results.scored_list[n + self.offset]
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     pass
-
-
-
-
-
-

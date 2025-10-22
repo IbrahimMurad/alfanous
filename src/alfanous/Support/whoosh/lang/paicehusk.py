@@ -19,19 +19,21 @@ from collections import defaultdict
 
 
 class PaiceHuskStemmer(object):
-    """Implements the Paice-Husk stemming algorithm.
-    """
-    
-    rule_expr = re.compile(r"""
+    """Implements the Paice-Husk stemming algorithm."""
+
+    rule_expr = re.compile(
+        r"""
     ^(?P<ending>\w+)
     (?P<intact>[*]?)
     (?P<num>\d+)
     (?P<append>\w*)
     (?P<cont>[.>])
-    """, re.UNICODE | re.VERBOSE)
-    
+    """,
+        re.UNICODE | re.VERBOSE,
+    )
+
     stem_expr = re.compile("^\w+", re.UNICODE)
-    
+
     def __init__(self, ruletable):
         """
         :param ruletable: a string containing the rule data, separated
@@ -39,16 +41,16 @@ class PaiceHuskStemmer(object):
         """
         self.rules = defaultdict(list)
         self.read_rules(ruletable)
-    
+
     def read_rules(self, ruletable):
         rule_expr = self.rule_expr
         rules = self.rules
-        
+
         for line in ruletable.split("\n"):
             line = line.strip()
             if not line:
                 continue
-            
+
             match = rule_expr.match(line)
             if match:
                 ending = match.group("ending")[::-1]
@@ -57,62 +59,72 @@ class PaiceHuskStemmer(object):
                 num = int(match.group("num"))
                 append = match.group("append")
                 cont = match.group("cont") == ">"
-                
+
                 rules[lastchar].append((ending, intact, num, append, cont))
             else:
                 raise Exception("Bad rule: %r" % line)
 
     def first_vowel(self, word):
-        vp = min([p for p in [word.find(v) for v in "aeiou"]
-                  if p > -1])
+        vp = min([p for p in [word.find(v) for v in "aeiou"] if p > -1])
         yp = word.find("y")
         if yp > 0 and yp < vp:
             return yp
         return vp
 
     def strip_prefix(self, word):
-        for prefix in ("kilo", "micro", "milli", "intra", "ultra", "mega",
-                       "nano", "pico", "pseudo"):
+        for prefix in (
+            "kilo",
+            "micro",
+            "milli",
+            "intra",
+            "ultra",
+            "mega",
+            "nano",
+            "pico",
+            "pseudo",
+        ):
             if word.startswith(prefix):
-                return word[len(prefix):]
+                return word[len(prefix) :]
         return word
 
     def stem(self, word):
-        """Returns a stemmed version of the argument string.
-        """
-        
+        """Returns a stemmed version of the argument string."""
+
         rules = self.rules
         match = self.stem_expr.match(word)
-        if not match: return word
+        if not match:
+            return word
         stem = self.strip_prefix(match.group(0))
-        
+
         is_intact = True
         continuing = True
         while continuing:
             pfv = self.first_vowel(stem)
             rulelist = rules.get(stem[-1])
-            if not rulelist: break
-            
+            if not rulelist:
+                break
+
             continuing = False
             for ending, intact, num, append, cont in rulelist:
                 if stem.endswith(ending):
-                    if intact and not is_intact: continue
+                    if intact and not is_intact:
+                        continue
                     newlen = len(stem) - num + len(append)
-                    
-                    if ((pfv == 0 and newlen < 2)
-                        or (pfv > 0 and newlen < 3)):
+
+                    if (pfv == 0 and newlen < 2) or (pfv > 0 and newlen < 3):
                         # If word starts with vowel, minimum stem length is 2.
                         # If word starts with consonant, minimum stem length is
                         # 3.
-                            continue
-                    
+                        continue
+
                     is_intact = False
-                    stem = stem[:0-num] + append
-                    
+                    stem = stem[: 0 - num] + append
+
                     continuing = cont
                     break
-        
+
         return stem
+
 
 # The default rules for the Paice-Husk stemming algorithm
 
@@ -237,10 +249,3 @@ zy1s.     { -yz > -ys  }
 # Make the standard rules available as a module-level function
 
 stem = PaiceHuskStemmer(defaultrules).stem
-
-
-
-
-
-
-

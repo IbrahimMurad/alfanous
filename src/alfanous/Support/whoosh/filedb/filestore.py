@@ -1,32 +1,31 @@
-#===============================================================================
+# ===============================================================================
 # Copyright 2009 Matt Chaput
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #    http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#===============================================================================
+# ===============================================================================
 
 import os
-from cStringIO import StringIO
+from io import StringIO
 from threading import Lock
 
+from alfanous.Support.whoosh.filedb.structfile import StructFile
 from alfanous.Support.whoosh.index import _DEF_INDEX_NAME
 from alfanous.Support.whoosh.store import Storage
 from alfanous.Support.whoosh.support.filelock import FileLock
-from alfanous.Support.whoosh.filedb.structfile import StructFile
 
 
 class FileStorage(Storage):
-    """Storage object that stores the index as files in a directory on disk.
-    """
+    """Storage object that stores the index as files in a directory on disk."""
 
     def __init__(self, path, mapped=True):
         self.folder = path
@@ -41,15 +40,16 @@ class FileStorage(Storage):
 
     def create_index(self, schema, indexname=_DEF_INDEX_NAME):
         from alfanous.Support.whoosh.filedb.fileindex import FileIndex
+
         return FileIndex(self, schema=schema, create=True, indexname=indexname)
 
     def open_index(self, indexname=_DEF_INDEX_NAME, schema=None):
         from alfanous.Support.whoosh.filedb.fileindex import FileIndex
+
         return FileIndex(self, schema=schema, indexname=indexname)
 
     def create_file(self, name):
-        f = StructFile(open(self._fpath(name), "wb"), name=name,
-                       mapped=self.mapped)
+        f = StructFile(open(self._fpath(name), "wb"), name=name, mapped=self.mapped)
         return f
 
     def open_file(self, name, *args, **kwargs):
@@ -79,8 +79,10 @@ class FileStorage(Storage):
 
     def file_exists(self, name):
         return os.path.exists(self._fpath(name))
+
     def file_modified(self, name):
         return os.path.getmtime(self._fpath(name))
+
     def file_length(self, name):
         return os.path.getsize(self._fpath(name))
 
@@ -106,13 +108,12 @@ class FileStorage(Storage):
 
 
 class RamStorage(FileStorage):
-    """Storage object that keeps the index in memory.
-    """
+    """Storage object that keeps the index in memory."""
 
     def __init__(self):
         self.files = {}
         self.locks = {}
-        self.folder = ''
+        self.folder = ""
 
     def __iter__(self):
         return iter(self.list())
@@ -152,6 +153,7 @@ class RamStorage(FileStorage):
     def create_file(self, name):
         def onclose_fn(sfile):
             self.files[name] = sfile.file.getvalue()
+
         f = StructFile(StringIO(), name=name, onclose=onclose_fn)
         return f
 
@@ -168,12 +170,13 @@ class RamStorage(FileStorage):
 
 def copy_to_ram(storage):
     """Copies the given FileStorage object into a new RamStorage object.
-    
+
     :rtype: :class:`RamStorage`
     """
 
-    import shutil #, time
-    #t = time.time()
+    import shutil  # , time
+
+    # t = time.time()
     ram = RamStorage()
     for name in storage.list():
         f = storage.open_file(name)
@@ -181,14 +184,5 @@ def copy_to_ram(storage):
         shutil.copyfileobj(f.file, r.file)
         f.close()
         r.close()
-    #print time.time() - t, "to load index into ram"
+    # print time.time() - t, "to load index into ram"
     return ram
-
-
-
-
-
-
-
-
-

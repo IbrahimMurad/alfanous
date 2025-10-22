@@ -1,21 +1,27 @@
-from araby_constants import *
-from araby_strip_functions import *
-from araby_predicates import *
+# ruff: noqa: F405, F403
+
 import string
 
-_PUNCTUATION  = string.punctuation + string.whitespace
+from alfanous.Support.PyArabic.araby_constants import *
+from alfanous.Support.PyArabic.araby_predicates import *
+from alfanous.Support.PyArabic.araby_strip_functions import *
+
+_PUNCTUATION = string.punctuation + string.whitespace
+
 
 def _andmap(iterable):
-    return reduce( lambda x,y: x and y, iterable )
+    return reduce(lambda x, y: x and y, iterable)
+
 
 def _ormap(iterable):
-    return reduce( lambda x,y: x or y, iterable )
+    return reduce(lambda x, y: x or y, iterable)
 
-def isSukun( archar ):
+
+def isSukun(archar):
     """Checks for Arabic Sukun Mark.
     @param archar: arabic unicode char
     @type archar: unicode
-    
+
     >>> _ormap( [isSukun( x ) for x in LETTERS] )
     False
     >>> isSukun( SUKUN )
@@ -23,11 +29,12 @@ def isSukun( archar ):
     """
     return archar == SUKUN
 
-def isShadda( archar ):
+
+def isShadda(archar):
     """Checks for Arabic Shadda Mark.
     @param archar: arabic unicode char
     @type archar: unicode
-    
+
     >>> _ormap( [isShadda( x ) for x in LETTERS] )
     False
     >>> isShadda( SHADDA )
@@ -35,11 +42,12 @@ def isShadda( archar ):
     """
     return archar == SHADDA
 
-def isTatweel( archar ):
+
+def isTatweel(archar):
     """Checks for Arabic Tatweel letter modifier.
     @param archar: arabic unicode char
     @type archar: unicode
-    
+
     >>> _ormap( [isTatweel( x ) for x in LETTERS] )
     False
     >>> isTatweel( TATWEEL )
@@ -47,57 +55,74 @@ def isTatweel( archar ):
     """
     return archar == TATWEEL
 
-def isTanwin( archar ):
+
+def isTanwin(archar):
     return archar in TANWIN
 
-def isTashkeel( archar ):
+
+def isTashkeel(archar):
     return archar in TASHKEEL
 
-def isHaraka( archar ):
+
+def isHaraka(archar):
     return archar in HARAKAT
 
-def isShortharaka( archar ):
+
+def isShortharaka(archar):
     return archar in SHORTHARAKAT
 
-def isLigature( archar ):
+
+def isLigature(archar):
     return archar in LIGUATURES
 
-def isHamza( archar ):
+
+def isHamza(archar):
     return archar in HAMZAT
 
-def isAlef( archar ):
+
+def isAlef(archar):
     return archar in ALEFAT
 
-def isYehlike( archar ):
+
+def isYehlike(archar):
     return archar in YEHLIKE
 
-def isWawlike( archar ):
+
+def isWawlike(archar):
     return archar in WAWLIKE
 
-def isTeh( archar ):
+
+def isTeh(archar):
     return archar in TEHLIKE
 
-def isSmall( archar ):
+
+def isSmall(archar):
     return archar in SMALL
 
-def isWeak( archar ):
+
+def isWeak(archar):
     return archar in WEAK
 
-def isMoon( archar ):
+
+def isMoon(archar):
     return archar in MOON
 
-def isSun( archar ):
+
+def isSun(archar):
     return archar in SUN
 
-def hasShadda( word ):
+
+def hasShadda(word):
     for char in word:
         if char == SHADDA:
             return True
-    
+
     return False
-def isVocalized( word ):
+
+
+def isVocalized(word):
     harakat_count = 0
-    
+
     for letter in word:
         if letter in _PUNCTUATION:
             return False
@@ -106,7 +131,8 @@ def isVocalized( word ):
 
     return harakat_count > 0
 
-def isVocalizedtext( text ):
+
+def isVocalizedtext(text):
     harakat_count = 0
 
     for letter in text:
@@ -117,37 +143,51 @@ def isVocalizedtext( text ):
 
     return harakat_count > 0
 
-def isArabicstring( text):
-    """ Checks for an  Arabic Unicode block characters;
+
+def isArabicstring(text):
+    """Checks for an  Arabic Unicode block characters;
     @param text: input text
     @type text: unicode
     @return: True if all charaters are in Arabic block
     @rtype: Boolean
     """
-    return not re.search(u"([^\u0600-\u0652%s%s%s\w])"%(LAM_ALEF,LAM_ALEF_HAMZA_ABOVE,LAM_ALEF_MADDA_ABOVE),text)
+    return not re.search(
+        "([^\u0600-\u0652%s%s%s\w])"
+        % (LAM_ALEF, LAM_ALEF_HAMZA_ABOVE, LAM_ALEF_MADDA_ABOVE),
+        text,
+    )
 
-def isArabicword( word ):
-    """ Checks for an valid Arabic  word.
+
+def isArabicword(word):
+    """Checks for an valid Arabic  word.
     An Arabic word
     @param word: input word
     @type word: unicode
     @return: True if all charaters are in Arabic block
     @rtype: Boolean
     """
-    if len( word ) == 0 : return False;
-    elif re.search( u"([^\u0600-\u0652%s%s%s\w])" % ( LAM_ALEF, LAM_ALEF_HAMZA_ABOVE, LAM_ALEF_MADDA_ABOVE ), word ):
-        return False;
-    elif isHaraka( word[0] ) or word[0] in ( WAW_HAMZA, YEH_HAMZA ):
-        return False;
-#  if Teh Marbuta or Alef_Maksura not in the end
-    elif re.match( u"^(.)*[%s](.)+$" % ALEF_MAKSURA, word ):
-        return False;
-    elif re.match( u"^(.)*[%s]([^%s%s%s])(.)+$" % ( TEH_MARBUTA, DAMMA, KASRA, FATHA ), word ):
-        return False;
+    if len(word) == 0:
+        return False
+    elif re.search(
+        "([^\u0600-\u0652%s%s%s\w])"
+        % (LAM_ALEF, LAM_ALEF_HAMZA_ABOVE, LAM_ALEF_MADDA_ABOVE),
+        word,
+    ):
+        return False
+    elif isHaraka(word[0]) or word[0] in (WAW_HAMZA, YEH_HAMZA):
+        return False
+    #  if Teh Marbuta or Alef_Maksura not in the end
+    elif re.match("^(.)*[%s](.)+$" % ALEF_MAKSURA, word):
+        return False
+    elif re.match(
+        "^(.)*[%s]([^%s%s%s])(.)+$" % (TEH_MARBUTA, DAMMA, KASRA, FATHA), word
+    ):
+        return False
     else:
-        return True;
+        return True
 
-def vocalizedlike( word, vocalized ):
+
+def vocalizedlike(word, vocalized):
     """return True if the given word have the same or the partial vocalisation like the pattern vocalized
 
     @param word: arabic word, full/partial vocalized.
@@ -163,15 +203,15 @@ def vocalizedlike( word, vocalized ):
     True
     >>> vocalizedlike( REH + JEEM + TEH + LAM, REH + JEEM + DAMMA + LAM + DAMMATAN )
     False
-    >>> 
+    >>>
     """
-    if not isVocalized( vocalized ) or not isVocalized( word ):
-        return stripTashkeel( word ) == stripTashkeel( vocalized )
+    if not isVocalized(vocalized) or not isVocalized(word):
+        return stripTashkeel(word) == stripTashkeel(vocalized)
 
     else:
         for mark in TASHKEEL:
-            vocalized = vocalized.replace( mark, mark + '?' )
+            vocalized = vocalized.replace(mark, mark + "?")
 
-        pat = re.compile( "^" + vocalized + "$" )
+        pat = re.compile("^" + vocalized + "$")
 
-        return pat.match( word )
+        return pat.match(word)

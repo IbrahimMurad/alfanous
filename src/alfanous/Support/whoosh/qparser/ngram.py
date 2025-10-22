@@ -1,21 +1,23 @@
-#===============================================================================
+# ===============================================================================
 # Copyright 2010 Matt Chaput
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #    http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#===============================================================================
+# ===============================================================================
+
+# ruff: noqa: F405
 
 from alfanous.Support.whoosh.analysis import NgramAnalyzer
-from alfanous.Support.whoosh.query import *
+from alfanous.Support.whoosh.query import *  # noqa: F403
 
 
 class SimpleNgramParser(object):
@@ -24,11 +26,22 @@ class SimpleNgramParser(object):
     or compose them as optional clauses to the query.
     """
 
-    __inittypes__ = dict(fieldname=str, minchars=int, maxchars=int,
-                         discardspaces=bool, analyzerclass=type)
+    __inittypes__ = dict(
+        fieldname=str,
+        minchars=int,
+        maxchars=int,
+        discardspaces=bool,
+        analyzerclass=type,
+    )
 
-    def __init__(self, fieldname, minchars, maxchars, discardspaces=False,
-                 analyzerclass=NgramAnalyzer):
+    def __init__(
+        self,
+        fieldname,
+        minchars,
+        maxchars,
+        discardspaces=False,
+        analyzerclass=NgramAnalyzer,
+    ):
         """
         :param fieldname: The field to search.
         :param minchars: The minimum gram size the text was indexed with.
@@ -73,7 +86,3 @@ class SimpleNgramParser(object):
                 return andquery
         else:
             return NullQuery
-
-
-
-

@@ -54,6 +54,8 @@ http://pyparsing.wikispaces.com/space/showimage/searchparser.py
 # - Rudolph Froger
 # - Paul McGuire
 
+# ruff: noqa: F405
+
 from pyparsing import (
     CharsNotIn,
     Combine,
@@ -74,7 +76,7 @@ from pyparsing import (
     printables,
 )
 
-from alfanous.Support.whoosh.query import *
+from alfanous.Support.whoosh.query import *  # noqa: F403
 
 
 def _make_default_parser():

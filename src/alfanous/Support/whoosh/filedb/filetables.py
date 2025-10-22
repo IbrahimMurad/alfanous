@@ -1,18 +1,18 @@
-#===============================================================================
+# ===============================================================================
 # Copyright 2009 Matt Chaput
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #    http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#===============================================================================
+# ===============================================================================
 
 """This module defines writer and reader classes for a fast, immutable
 on-disk key-value database format. The current format is identical
@@ -22,33 +22,43 @@ to D. J. Bernstein's CDB format (http://cr.yp.to/cdb.html).
 from array import array
 from bisect import bisect_right
 from collections import defaultdict
-from cPickle import dumps, loads
+from pickle import dumps, loads
 from struct import Struct
 
-from alfanous.Support.whoosh.system import _USHORT_SIZE, _INT_SIZE
-from alfanous.Support.whoosh.util import utf8encode, utf8decode
+from alfanous.Support.whoosh.system import _INT_SIZE, _USHORT_SIZE
+from alfanous.Support.whoosh.util import utf8decode, utf8encode
 
 
 def cdb_hash(key):
     h = 5381
     for c in key:
-        h = (h + (h << 5)) & 0xffffffffL ^ ord(c)
+        h = (h + (h << 5)) & 0xFFFFFFFF ^ ord(str(c)[0])
     return h
+
 
 # Read/write convenience functions
 
 _2ints = Struct("!II")
 pack2ints = _2ints.pack
+
+
 def writeints(f, value1, value2):
     f.write(pack2ints(value1, value2))
 
+
 _unpack2ints = _2ints.unpack
+
+
 def unpack2ints(s):
     return _unpack2ints(s)
 
+
 _unpackint = Struct("!I").unpack
+
+
 def readint(map, offset):
-    return _unpackint(map[offset:offset + 4])[0]
+    return _unpackint(map[offset : offset + 4])[0]
+
 
 # Encoders and decoders for storing complex types in
 # string -> string hash files.
@@ -56,26 +66,37 @@ def readint(map, offset):
 _int_struct = Struct("!i")
 packint = _int_struct.pack
 _unpackint = _int_struct.unpack
+
+
 def unpackint(s):
     return _unpackint(s)[0]
+
 
 _ushort_struct = Struct("!H")
 packushort = _ushort_struct.pack
 _unpackushort = _ushort_struct.unpack
+
+
 def unpackushort(s):
     return _unpackushort(s)[0]
+
 
 def encode_termkey(term):
     fieldnum, text = term
     return packushort(fieldnum) + utf8encode(text)[0]
 
+
 def decode_termkey(key):
     return unpackushort(key[:_USHORT_SIZE]), utf8decode(key[_USHORT_SIZE:])[0]
 
+
 _vkey_struct = Struct("!Ii")
 _pack_vkey = _vkey_struct.pack
+
+
 def encode_vectorkey(docandfield):
     return _pack_vkey(*docandfield)
+
 
 decode_vectorkey = _vkey_struct.unpack
 encode_docnum = packint
@@ -83,18 +104,25 @@ decode_docnum = unpackint
 
 _terminfo_struct = Struct("!ILI")
 _terminfo_pack = _terminfo_struct.pack
+
+
 def encode_terminfo(cf_offset_df):
     return _terminfo_pack(*cf_offset_df)
+
+
 decode_terminfo = _terminfo_struct.unpack
+
 
 def enpickle(data):
     "Encodes a value as a string for storage in a table."
     return dumps(data, -1)
 
+
 depickle = loads
 
 
 # Table classes
+
 
 class FileHashWriter(object):
     def __init__(self, dbfile):
@@ -130,7 +158,7 @@ class FileHashWriter(object):
         directory = self.directory = []
 
         pos = dbfile.tell()
-        for i in xrange(0, 256):
+        for i in range(0, 256):
             entries = hashes[i]
             numslots = 2 * len(entries)
             directory.append((pos, numslots))
@@ -180,10 +208,10 @@ class FileHashReader(object):
         self.is_closed = True
 
     def read(self, position, length):
-        return self.map[position:position + length]
+        return self.map[position : position + length]
 
     def read2ints(self, position):
-        return unpack2ints(self.map[position:position + _INT_SIZE * 2])
+        return unpack2ints(self.map[position : position + _INT_SIZE * 2])
 
     def _ranges(self, pos=2048):
         read2ints = self.read2ints
@@ -245,7 +273,7 @@ class FileHashReader(object):
             return
 
         slotpos = hpos + (((keyhash >> 8) % hslots) << 3)
-        for _ in xrange(0, hslots):
+        for _ in range(0, hslots):
             u, pos = read2ints(slotpos)
             if not pos:
                 return
@@ -292,7 +320,7 @@ class OrderedHashWriter(FileHashWriter):
         lk = self.lastkey
 
         for key, value in items:
-            if key <= lk:
+            if lk is not None and key <= lk:
                 raise ValueError("Keys must increase: %r .. %r" % (lk, key))
             lk = key
 
@@ -380,8 +408,7 @@ class FileTableWriter(OrderedHashWriter):
 
 
 class FileTableReader(OrderedHashReader):
-    def __init__(self, dbfile, keycoder=None, keydecoder=None,
-                 valuedecoder=None):
+    def __init__(self, dbfile, keycoder=None, keydecoder=None, valuedecoder=None):
         sup = super(FileTableReader, self)
         sup.__init__(dbfile)
         self.keycoder = keycoder or str
@@ -454,7 +481,9 @@ class FileRecordReader(object):
 
     def record(self, recordnum):
         itemsize = self.itemsize
-        return self._unpack(self.map[recordnum * itemsize: recordnum * itemsize + itemsize])
+        return self._unpack(
+            self.map[recordnum * itemsize : recordnum * itemsize + itemsize]
+        )
 
     def at(self, recordnum, itemnum):
         return self.record(recordnum)[itemnum]
@@ -498,12 +527,13 @@ class FileListReader(object):
     def __getitem__(self, num):
         dbfile = self.dbfile
         offset = self.offset + num * (_INT_SIZE * 2)
-        position, length = unpack2ints(dbfile.map[offset:offset + _INT_SIZE * 2])
-        v = dbfile.map[position:position + length]
+        position, length = unpack2ints(dbfile.map[offset : offset + _INT_SIZE * 2])
+        v = dbfile.map[position : position + length]
         return self.valuedecoder(v)
 
 
 # Utility functions
+
 
 def dump_hash(hashreader):
     dbfile = hashreader.dbfile
@@ -534,7 +564,3 @@ def dump_hash(hashreader):
         data = read(datapos, datalen)
         print("%d +%d,%d:%r->%r" % (pos, keylen, datalen, key, data))
         pos = datapos + datalen
-
-
-
-

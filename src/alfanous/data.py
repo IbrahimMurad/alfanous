@@ -1,9 +1,13 @@
-import os
 import json
+import os
 
 from alfanous import paths
-from alfanous.engines import QuranicSearchEngine, FuzzyQuranicSearchEngine
-from alfanous.engines import TraductionSearchEngine, WordSearchEngine
+from alfanous.engines import (
+    FuzzyQuranicSearchEngine,
+    QuranicSearchEngine,
+    TraductionSearchEngine,
+    WordSearchEngine,
+)
 
 
 def recitations(path=paths.RECITATIONS_LIST_FILE):
@@ -65,21 +69,21 @@ def WSE(path=paths.WSE_INDEX):
 
 try:
     from alfanous.dynamic_resources.arabicnames_dyn import ara2eng_names as Fields
-except:
+except ImportError:
     Fields = {}
 try:
     from alfanous.dynamic_resources.std2uth_dyn import std2uth_words
-except:
+except ImportError:
     std2uth_words = {}
 try:
     from alfanous.dynamic_resources.vocalizations_dyn import vocalization_dict
-except:
+except ImportError:
     vocalization_dict = {}
 try:
     from alfanous.dynamic_resources.synonymes_dyn import syndict
-except:
+except ImportError:
     syndict = {}
 try:
     from alfanous.dynamic_resources.derivations_dyn import derivedict
-except:
+except ImportError:
     derivedict = {"root": []}

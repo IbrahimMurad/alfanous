@@ -1,18 +1,18 @@
-#===============================================================================
+# ===============================================================================
 # Copyright 2007 Matt Chaput
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #    http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#===============================================================================
+# ===============================================================================
 
 """This module contains objects that query the search index. These query
 objects are composable to form complex query trees.
@@ -20,24 +20,47 @@ objects are composable to form complex query trees.
 
 from __future__ import division
 
-__all__ = ("QueryError", "Term", "And", "Or", "Not", "DisjunctionMax",
-           "Prefix", "Wildcard", "FuzzyTerm", "TermRange", "Variations",
-           "Phrase", "NullQuery", "Require", "AndMaybe", "AndNot")
+__all__ = (
+    "QueryError",
+    "Term",
+    "And",
+    "Or",
+    "Not",
+    "DisjunctionMax",
+    "Prefix",
+    "Wildcard",
+    "FuzzyTerm",
+    "TermRange",
+    "Variations",
+    "Phrase",
+    "NullQuery",
+    "Require",
+    "AndMaybe",
+    "AndNot",
+)
 
 import copy
+import fnmatch
+import re
 from bisect import bisect_left, bisect_right
-import fnmatch, re
 
 from alfanous.Support.whoosh.lang.morph_en import variations
-from alfanous.Support.whoosh.postings import QueryScorer, EmptyScorer
-from alfanous.Support.whoosh.postings import IntersectionScorer, UnionScorer
-from alfanous.Support.whoosh.postings import RequireScorer, AndMaybeScorer, InverseScorer
-from alfanous.Support.whoosh.postings import ReadTooFar
+from alfanous.Support.whoosh.postings import (
+    AndMaybeScorer,
+    EmptyScorer,
+    IntersectionScorer,
+    InverseScorer,
+    QueryScorer,
+    ReadTooFar,
+    RequireScorer,
+    UnionScorer,
+)
 from alfanous.Support.whoosh.reading import TermNotFound
 from alfanous.Support.whoosh.support.bitvector import BitVector
 from alfanous.Support.whoosh.support.levenshtein import relative
 
 # Utilities
+
 
 def _not_vector(searcher, notqueries, sourcevector):
     # Returns a BitVector where the positions are docnums
@@ -59,26 +82,28 @@ def _not_vector(searcher, notqueries, sourcevector):
 
 # Exceptions
 
+
 class QueryError(Exception):
-    """Error encountered while running a query.
-    """
+    """Error encountered while running a query."""
+
     pass
 
 
 # Base classes
 
+
 class Query(object):
     """Abstract base class for all queries.
-    
+
     Note that this base class implements __or__, __and__, and __sub__ to allow
     slightly more convenient composition of query objects::
-    
+
         >>> Term("content", u"a") | Term("content", u"b")
         Or([Term("content", u"a"), Term("content", u"b")])
-        
+
         >>> Term("content", u"a") & Term("content", u"b")
         And([Term("content", u"a"), Term("content", u"b")])
-        
+
         >>> Term("content", u"a") - Term("content", u"b")
         And([Term("content", u"a"), Not(Term("content", u"b"))])
     """
@@ -104,15 +129,15 @@ class Query(object):
 
     def all_terms(self, termset=None, phrases=True):
         """Returns a set of all terms in this query tree.
-        
+
         This method simply operates on the query itself, without reference to
         an index (unlike existing_terms()), so it will *not* add terms that
         require an index to compute, such as Prefix and Wildcard.
-        
+
         >>> q = And([Term("content", u"render"), Term("path", u"/a/b")])
         >>> q.all_terms()
         set([("content", u"render"), ("path", u"/a/b")])
-        
+
         :param phrases: Whether to add words found in Phrase queries.
         :rtype: set
         """
@@ -122,22 +147,21 @@ class Query(object):
         self._all_terms(termset, phrases=phrases)
         return termset
 
-    def existing_terms(self, ixreader, termset=None, reverse=False,
-                       phrases=True):
+    def existing_terms(self, ixreader, termset=None, reverse=False, phrases=True):
         """Returns a set of all terms in this query tree that exist in the
         index represented by the given ixreaderder.
-        
+
         This method references the IndexReader to expand Prefix and Wildcard
         queries, and only adds terms that actually exist in the index (unless
         reverse=True).
-        
+
         >>> ixreader = my_index.reader()
         >>> q = And([Or([Term("content", u"render"),
         ...             Term("content", u"rendering")]),
         ...             Prefix("path", u"/a/")])
         >>> q.existing_terms(ixreader, termset)
         set([("content", u"render"), ("path", u"/a/b"), ("path", u"/a/c")])
-        
+
         :param ixreader: A :class:`whoosh.reading.IndexReader` object.
         :param reverse: If True, this method adds *missing* terms rather than
             *existing* terms to the set.
@@ -147,8 +171,7 @@ class Query(object):
 
         if termset is None:
             termset = set()
-        self._existing_terms(ixreader, termset, reverse=reverse,
-                             phrases=phrases)
+        self._existing_terms(ixreader, termset, reverse=reverse, phrases=phrases)
         return termset
 
     def estimate_size(self, ixreader):
@@ -162,18 +185,18 @@ class Query(object):
     def scorer(self, searcher, exclude_docs=None):
         """Returns :class:`~whoosh.postings.QueryScorer` object you can use to
         retrieve documents and scores matching this query.
-        
+
         :rtype: :class:`whoosh.postings.QueryScorer`
         """
         raise NotImplementedError
 
     def docs(self, searcher, exclude_docs=None):
         """Returns an iterator of docnums matching this query.
-        
+
         >>> searcher = my_index.searcher()
         >>> list(my_query.docs(searcher))
         [10, 34, 78, 103]
-        
+
         :param searcher: A :class:`whoosh.searching.Searcher` object.
         :param exclude_docs: A :class:`~whoosh.support.bitvector.BitVector`
             of document numbers to exclude from the results, or None to not
@@ -189,10 +212,10 @@ class Query(object):
         """Returns an iterator of (docnum, score) pairs matching this query.
         This is a convenience method for when you don't need a QueryScorer
         (i.e. you don't need to use skip_to).
-        
+
         >>> list(my_query.doc_scores(ixreader))
         [(10, 0.73), (34, 2.54), (78, 0.05), (103, 12.84)]
-        
+
         :param searcher: A :class:`whoosh.searching.Searcher` object.
         :param exclude_docs: A :class:`~whoosh.support.bitvector.BitVector`
             of document numbers to exclude from the results, or None to not
@@ -207,13 +230,13 @@ class Query(object):
         automatically on query trees created by the query parser, but you may
         want to call it yourself if you're writing your own parser or building
         your own queries.
-        
+
         >>> q = And([And([Term("f", u"a"),
         ...               Term("f", u"b")]),
         ...               Term("f", u"c"), Or([])])
         >>> q.normalize()
         And([Term("f", u"a"), Term("f", u"b"), Term("f", u"c")])
-        
+
         Note that this returns a *new, normalized* query. It *does not* modify
         the original query "in place".
         """
@@ -229,7 +252,7 @@ class Query(object):
     def replace(self, oldtext, newtext):
         """Returns a copy of this query with oldtext replaced by newtext (if
         oldtext was anywhere in this query).
-        
+
         Note that this returns a *new* query with the given text replaced. It
         *does not* modify the original query "in place".
         """
@@ -261,22 +284,26 @@ class CompoundQuery(Query):
         return r
 
     def __unicode__(self):
-        r = u"("
-        r += (self.JOINT).join([unicode(s) for s in self.subqueries])
-        r += u")"
+        r = "("
+        r += (self.JOINT).join([str(s) for s in self.subqueries])
+        r += ")"
         return r
 
     def __eq__(self, other):
-        return other and self.__class__ is other.__class__ and\
-        self.subqueries == other.subqueries and\
-        self.boost == other.boost
+        return (
+            other
+            and self.__class__ is other.__class__
+            and self.subqueries == other.subqueries
+            and self.boost == other.boost
+        )
 
     def __getitem__(self, i):
         return self.subqueries.__getitem__(i)
 
     def replace(self, oldtext, newtext):
-        return self.__class__([q.replace(oldtext, newtext)
-                               for q in self.subqueries], boost=self.boost)
+        return self.__class__(
+            [q.replace(oldtext, newtext) for q in self.subqueries], boost=self.boost
+        )
 
     def accept(self, visitor):
         qs = [q.accept(visitor) for q in self.subqueries]
@@ -288,8 +315,7 @@ class CompoundQuery(Query):
 
     def _existing_terms(self, ixreader, termset, reverse=False, phrases=True):
         for q in self.subqueries:
-            q.existing_terms(ixreader, termset, reverse=reverse,
-                             phrases=phrases)
+            q.existing_terms(ixreader, termset, reverse=reverse, phrases=phrases)
 
     def normalize(self):
         # Do an initial check for NullQuery.
@@ -333,8 +359,9 @@ class CompoundQuery(Query):
         subs, nots = self._split_queries()
 
         if subs:
-            subs = self.__class__([subq.simplify(ixreader) for subq in subs],
-                                  boost=self.boost)
+            subs = self.__class__(
+                [subq.simplify(ixreader) for subq in subs], boost=self.boost
+            )
             if nots:
                 nots = Or(nots).normalize().simplify()
                 return AndNot(subs, nots)
@@ -346,8 +373,9 @@ class CompoundQuery(Query):
     def _subscorers(self, searcher, exclude_docs):
         subs, nots = self._split_queries()
         exclude_docs = _not_vector(searcher, nots, exclude_docs)
-        subscorers = [subquery.scorer(searcher, exclude_docs=exclude_docs)
-                      for subquery in subs]
+        subscorers = [
+            subquery.scorer(searcher, exclude_docs=exclude_docs) for subquery in subs
+        ]
         return subscorers
 
 
@@ -360,8 +388,10 @@ class MultiTerm(Query):
         raise NotImplementedError
 
     def simplify(self, ixreader):
-        return Or([Term(self.fieldname, word, boost=self.boost)
-                   for word in self._words(ixreader)])
+        return Or([
+            Term(self.fieldname, word, boost=self.boost)
+            for word in self._words(ixreader)
+        ])
 
     def _all_terms(self, termset, phrases=True):
         pass
@@ -371,14 +401,16 @@ class MultiTerm(Query):
         for word in self._words(ixreader):
             t = (fieldname, word)
             contains = t in ixreader
-            if reverse: contains = not contains
+            if reverse:
+                contains = not contains
             if contains:
                 termset.add(t)
 
     def estimate_size(self, ixreader):
         fieldnum = ixreader.fieldname_to_num(self.fieldname)
-        return sum(ixreader.doc_frequency(fieldnum, text)
-                   for text in self._words(ixreader))
+        return sum(
+            ixreader.doc_frequency(fieldnum, text) for text in self._words(ixreader)
+        )
 
     def scorer(self, searcher, exclude_docs=None):
         fn = self.fieldname
@@ -398,9 +430,10 @@ class MultiTerm(Query):
 
 # Concrete classes
 
+
 class Term(Query):
     """Matches documents containing the given term (fieldname+text pair).
-    
+
     >>> Term("content", u"render")
     """
 
@@ -408,8 +441,17 @@ class Term(Query):
         def __init__(self, postreader, score_fn):
             self.postreader = postreader
             self.score_fn = score_fn
-            for name in ("__cmp__", "reset", "all_items", "all_ids", "all_as",
-                         "next", "skip_to", "value", "value_as"):
+            for name in (
+                "__cmp__",
+                "reset",
+                "all_items",
+                "all_ids",
+                "all_as",
+                "next",
+                "skip_to",
+                "value",
+                "value_as",
+            ):
                 setattr(self, name, getattr(postreader, name))
 
         @property
@@ -421,7 +463,7 @@ class Term(Query):
             weight = self.value_as("weight")
             return self.score_fn(docnum, weight)
 
-    __inittypes__ = dict(fieldname=str, text=unicode, boost=float)
+    __inittypes__ = dict(fieldname=str, text=str, boost=float)
 
     def __init__(self, fieldname, text, boost=1.0):
         self.fieldname = fieldname
@@ -429,12 +471,13 @@ class Term(Query):
         self.boost = boost
 
     def __eq__(self, other):
-        return (other
-                and self.__class__ is other.__class__
-                and
-                self.fieldname == other.fieldname
-                and self.text == other.text
-                and self.boost == other.boost)
+        return (
+            other
+            and self.__class__ is other.__class__
+            and self.fieldname == other.fieldname
+            and self.text == other.text
+            and self.boost == other.boost
+        )
 
     def __repr__(self):
         r = "%s(%r, %r" % (self.__class__.__name__, self.fieldname, self.text)
@@ -444,9 +487,9 @@ class Term(Query):
         return r
 
     def __unicode__(self):
-        t = u"%s:%s" % (self.fieldname, self.text)
+        t = "%s:%s" % (self.fieldname, self.text)
         if self.boost != 1:
-            t += u"^" + unicode(self.boost)
+            t += "^" + str(self.boost)
         return t
 
     def _all_terms(self, termset, phrases=True):
@@ -456,7 +499,8 @@ class Term(Query):
         fieldname, text = self.fieldname, self.text
         fieldnum = ixreader.fieldname_to_num(fieldname)
         contains = (fieldnum, text) in ixreader
-        if reverse: contains = not contains
+        if reverse:
+            contains = not contains
         if contains:
             termset.add((fieldname, text))
 
@@ -480,8 +524,7 @@ class Term(Query):
             return score_methd(searcher, fieldnum, text, docnum, weight) * boost
 
         try:
-            postreader = searcher.postings(fieldnum, text,
-                                           exclude_docs=exclude_docs)
+            postreader = searcher.postings(fieldnum, text, exclude_docs=exclude_docs)
             return Term.TermScorer(postreader, score_fn)
         except TermNotFound:
             return EmptyScorer()
@@ -489,7 +532,7 @@ class Term(Query):
 
 class And(CompoundQuery):
     """Matches documents that match ALL of the subqueries.
-    
+
     >>> And([Term("content", u"render"),
     ...      Term("content", u"shade"),
     ...      Not(Term("content", u"texture"))])
@@ -504,13 +547,14 @@ class And(CompoundQuery):
         return min(q.estimate_size(ixreader) for q in self.subqueries)
 
     def scorer(self, searcher, exclude_docs=None):
-        return IntersectionScorer(self._subscorers(searcher, exclude_docs),
-                                  boost=self.boost)
+        return IntersectionScorer(
+            self._subscorers(searcher, exclude_docs), boost=self.boost
+        )
 
 
 class Or(CompoundQuery):
     """Matches documents that match ANY of the subqueries.
-    
+
     >>> Or([Term("content", u"render"),
     ...     And([Term("content", u"shade"), Term("content", u"texture")]),
     ...     Not(Term("content", u"network"))])
@@ -535,19 +579,22 @@ class Or(CompoundQuery):
         return r
 
     def __unicode__(self):
-        r = u"("
-        r += (self.JOINT).join([unicode(s) for s in self.subqueries])
-        r += u")"
+        r = "("
+        r += (self.JOINT).join([str(s) for s in self.subqueries])
+        r += ")"
         if self.minmatch:
-            r += u">%s" % self.minmatch
+            r += ">%s" % self.minmatch
         return r
 
     def estimate_size(self, ixreader):
         return sum(q.estimate_size(ixreader) for q in self.subqueries)
 
     def scorer(self, searcher, exclude_docs=None):
-        return UnionScorer(self._subscorers(searcher, exclude_docs),
-                           boost=self.boost, minmatch=self.minmatch)
+        return UnionScorer(
+            self._subscorers(searcher, exclude_docs),
+            boost=self.boost,
+            minmatch=self.minmatch,
+        )
 
     def normalize(self):
         norm = CompoundQuery.normalize(self)
@@ -584,17 +631,20 @@ class DisjunctionMax(CompoundQuery):
         self.tiebreak = tiebreak
 
     def __unicode__(self):
-        s = u"DisMax" + Or.__unicode__(self)
+        s = "DisMax" + Or.__unicode__(self)
         if self.tiebreak:
-            s += u"~" + unicode(self.tiebreak)
+            s += "~" + str(self.tiebreak)
         return s
 
     def estimate_size(self, ixreader):
         return Or.estimate_size(self, ixreader)
 
     def scorer(self, searcher, exclude_docs=None):
-        return self.DisMaxScorer(self._subscorers(searcher, exclude_docs),
-                                 boost=self.boost, tiebreak=self.tiebreak)
+        return self.DisMaxScorer(
+            self._subscorers(searcher, exclude_docs),
+            boost=self.boost,
+            tiebreak=self.tiebreak,
+        )
 
     def normalize(self):
         norm = CompoundQuery.normalize(self)
@@ -605,7 +655,7 @@ class DisjunctionMax(CompoundQuery):
 
 class Not(Query):
     """Excludes any documents that match the subquery.
-    
+
     >>> # Match documents that contain 'render' but not 'texture'
     >>> And([Term("content", u"render"),
     ...      Not(Term("content", u"texture"))])
@@ -627,14 +677,13 @@ class Not(Query):
         self.boost = boost
 
     def __eq__(self, other):
-        return other and self.__class__ is other.__class__ and\
-        self.query == other.query
+        return other and self.__class__ is other.__class__ and self.query == other.query
 
     def __repr__(self):
         return "%s(%s)" % (self.__class__.__name__, repr(self.query))
 
     def __unicode__(self):
-        return u"NOT " + unicode(self.query)
+        return "NOT " + str(self.query)
 
     def normalize(self):
         query = self.query.normalize()
@@ -653,8 +702,7 @@ class Not(Query):
         self.query.all_terms(termset, phrases=phrases)
 
     def _existing_terms(self, ixreader, termset, reverse=False, phrases=True):
-        self.query.existing_terms(ixreader, termset, reverse=reverse,
-                                  phrases=phrases)
+        self.query.existing_terms(ixreader, termset, reverse=reverse, phrases=phrases)
 
     def estimate_size(self, ixreader):
         return ixreader.doc_count()
@@ -667,12 +715,12 @@ class Not(Query):
 
 class Prefix(MultiTerm):
     """Matches documents that contain any terms that start with the given text.
-    
+
     >>> # Match documents containing words starting with 'comp'
     >>> Prefix("content", u"comp")
     """
 
-    __inittypes__ = dict(fieldname=str, text=unicode, boost=float)
+    __inittypes__ = dict(fieldname=str, text=str, boost=float)
 
     def __init__(self, fieldname, text, boost=1.0):
         self.fieldname = fieldname
@@ -680,9 +728,13 @@ class Prefix(MultiTerm):
         self.boost = boost
 
     def __eq__(self, other):
-        return other and self.__class__ is other.__class__ and\
-        self.fieldname == other.fieldname and self.text == other.text and\
-        self.boost == other.boost
+        return (
+            other
+            and self.__class__ is other.__class__
+            and self.fieldname == other.fieldname
+            and self.text == other.text
+            and self.boost == other.boost
+        )
 
     def __repr__(self):
         r = "%s(%r, %r" % (self.__class__.__name__, self.fieldname, self.text)
@@ -698,15 +750,17 @@ class Prefix(MultiTerm):
         return ixreader.expand_prefix(self.fieldname, self.text)
 
 
-_wildcard_exp = re.compile("(.*?)([?*]|$)");
+_wildcard_exp = re.compile("(.*?)([?*]|$)")
+
+
 class Wildcard(MultiTerm):
     """Matches documents that contain any terms that match a wildcard
     expression.
-    
+
     >>> Wildcard("content", u"in*f?x")
     """
 
-    __inittypes__ = dict(fieldname=str, text=unicode, boost=float)
+    __inittypes__ = dict(fieldname=str, text=str, boost=float)
 
     def __init__(self, fieldname, text, boost=1.0):
         """
@@ -735,12 +789,16 @@ class Wildcard(MultiTerm):
         elif st < 0:
             self.prefix = text[:qm]
         else:
-            self.prefix = text[:min(st, qm)]
+            self.prefix = text[: min(st, qm)]
 
     def __eq__(self, other):
-        return other and self.__class__ is other.__class__ and\
-        self.fieldname == other.fieldname and self.text == other.text and\
-        self.boost == other.boost
+        return (
+            other
+            and self.__class__ is other.__class__
+            and self.fieldname == other.fieldname
+            and self.text == other.text
+            and self.boost == other.boost
+        )
 
     def __repr__(self):
         r = "%s(%r, %r" % (self.__class__.__name__, self.fieldname, self.text)
@@ -772,10 +830,12 @@ class Wildcard(MultiTerm):
         if "*" not in text and "?" not in text:
             # If no wildcard chars, convert to a normal term.
             return Term(self.fieldname, self.text, boost=self.boost)
-        elif ("?" not in text
-              and text.endswith("*")
-              and text.find("*") == len(text) - 1
-              and (len(text) < 2 or text[-2] != "\\")):
+        elif (
+            "?" not in text
+            and text.endswith("*")
+            and text.find("*") == len(text) - 1
+            and (len(text) < 2 or text[-2] != "\\")
+        ):
             # If the only wildcard char is an asterisk at the end, convert to a
             # Prefix query.
             return Prefix(self.fieldname, self.text[:-1], boost=self.boost)
@@ -784,14 +844,13 @@ class Wildcard(MultiTerm):
 
 
 class FuzzyTerm(MultiTerm):
-    """Matches documents containing words similar to the given term.
-    """
+    """Matches documents containing words similar to the given term."""
 
-    __inittypes__ = dict(fieldname=str, text=unicode, boost=float,
-                         minsimilarity=float, prefixlength=int)
+    __inittypes__ = dict(
+        fieldname=str, text=str, boost=float, minsimilarity=float, prefixlength=int
+    )
 
-    def __init__(self, fieldname, text, boost=1.0, minsimilarity=0.5,
-                 prefixlength=1):
+    def __init__(self, fieldname, text, boost=1.0, minsimilarity=0.5, prefixlength=1):
         """
         :param fieldname: The name of the field to search.
         :param text: The text to search for.
@@ -815,21 +874,26 @@ class FuzzyTerm(MultiTerm):
         self.prefixlength = prefixlength
 
     def __eq__(self, other):
-        return (other
-                and self.__class__ is other.__class__
-                and self.fieldname == other.fieldname
-                and self.text == other.text
-                and self.minsimilarity == other.minsimilarity
-                and self.prefixlength == other.prefixlength
-                and self.boost == other.boost)
+        return (
+            other
+            and self.__class__ is other.__class__
+            and self.fieldname == other.fieldname
+            and self.text == other.text
+            and self.minsimilarity == other.minsimilarity
+            and self.prefixlength == other.prefixlength
+            and self.boost == other.boost
+        )
 
     def __repr__(self):
-        return "%s(%r, %r, ratio=%f)" % (self.__class__.__name__,
-                                         self.fieldname, self.text,
-                                         self.ratio)
+        return "%s(%r, %r, ratio=%f)" % (
+            self.__class__.__name__,
+            self.fieldname,
+            self.text,
+            self.ratio,
+        )
 
     def __unicode__(self):
-        return u"~" + self.text
+        return "~" + self.text
 
     def _all_terms(self, termset, phrases=True):
         termset.add((self.fieldname, self.text))
@@ -837,8 +901,7 @@ class FuzzyTerm(MultiTerm):
     def _words(self, ixreader):
         text = self.text
         minsim = self.minsimilarity
-        for term in ixreader.expand_prefix(self.fieldname,
-                                           text[:self.prefixlength]):
+        for term in ixreader.expand_prefix(self.fieldname, text[: self.prefixlength]):
             if text == term:
                 yield term
             elif relative(text, term) > minsim:
@@ -847,14 +910,15 @@ class FuzzyTerm(MultiTerm):
 
 class TermRange(MultiTerm):
     """Matches documents containing any terms in a given range.
-    
+
     >>> # Match documents where the indexed "id" field is greater than or equal
     >>> # to 'apple' and less than or equal to 'pear'.
     >>> TermRange("id", u"apple", u"pear")
     """
 
-    def __init__(self, fieldname, start, end, startexcl=False, endexcl=False,
-                 boost=1.0):
+    def __init__(
+        self, fieldname, start, end, startexcl=False, endexcl=False, boost=1.0
+    ):
         """
         :param fieldname: The name of the field to search.
         :param start: Match terms equal to or greather than this.
@@ -875,44 +939,74 @@ class TermRange(MultiTerm):
         self.boost = boost
 
     def __eq__(self, other):
-        return (other
-                and self.__class__ is other.__class__
-                and self.fieldname == other.fieldname
-                and self.start == other.start
-                and self.end == other.end
-                and self.startexcl == other.startexcl
-                and self.endexcl == other.endexcl
-                and self.boost == other.boost)
+        return (
+            other
+            and self.__class__ is other.__class__
+            and self.fieldname == other.fieldname
+            and self.start == other.start
+            and self.end == other.end
+            and self.startexcl == other.startexcl
+            and self.endexcl == other.endexcl
+            and self.boost == other.boost
+        )
 
     def __repr__(self):
-        return '%s(%r, %r, %r, %s, %s)' % (self.__class__.__name__,
-                                           self.fieldname,
-                                           self.start, self.end,
-                                           self.startexcl, self.endexcl)
+        return "%s(%r, %r, %r, %s, %s)" % (
+            self.__class__.__name__,
+            self.fieldname,
+            self.start,
+            self.end,
+            self.startexcl,
+            self.endexcl,
+        )
 
     def __unicode__(self):
         startchar = "["
-        if self.startexcl: startchar = "{"
+        if self.startexcl:
+            startchar = "{"
         endchar = "]"
-        if self.endexcl: endchar = "}"
-        return u"%s:%s%s TO %s%s" % (self.fieldname,
-                                     startchar, self.start, self.end, endchar)
+        if self.endexcl:
+            endchar = "}"
+        return "%s:%s%s TO %s%s" % (
+            self.fieldname,
+            startchar,
+            self.start,
+            self.end,
+            endchar,
+        )
 
     def normalize(self):
         if self.start == self.end:
             return Term(self.fieldname, self.start, boost=self.boost)
         else:
-            return TermRange(self.fieldname, self.start, self.end,
-                             self.startexcl, self.endexcl,
-                             boost=self.boost)
+            return TermRange(
+                self.fieldname,
+                self.start,
+                self.end,
+                self.startexcl,
+                self.endexcl,
+                boost=self.boost,
+            )
 
     def replace(self, oldtext, newtext):
         if self.start == oldtext:
-            return TermRange(self.fieldname, newtext, self.end,
-                             self.startexcl, self.endexcl, boost=self.boost)
+            return TermRange(
+                self.fieldname,
+                newtext,
+                self.end,
+                self.startexcl,
+                self.endexcl,
+                boost=self.boost,
+            )
         elif self.end == oldtext:
-            return TermRange(self.fieldname, self.start, newtext,
-                             self.startexcl, self.endexcl, boost=self.boost)
+            return TermRange(
+                self.fieldname,
+                self.start,
+                newtext,
+                self.startexcl,
+                self.endexcl,
+                boost=self.boost,
+            )
         else:
             return self
 
@@ -954,9 +1048,13 @@ class Variations(MultiTerm):
         return r
 
     def __eq__(self, other):
-        return other and self.__class__ is other.__class__ and\
-        self.fieldname == other.fieldname and self.text == other.text and\
-        self.boost == other.boost
+        return (
+            other
+            and self.__class__ is other.__class__
+            and self.fieldname == other.fieldname
+            and self.text == other.text
+            and self.boost == other.boost
+        )
 
     def _all_terms(self, termset, phrases=True):
         termset.add(self.text)
@@ -966,7 +1064,7 @@ class Variations(MultiTerm):
         return [word for word in self.words if (fieldname, word) in ixreader]
 
     def __unicode__(self):
-        return u"%s:<%s>" % (self.fieldname, self.text)
+        return "%s:<%s>" % (self.fieldname, self.text)
 
     def replace(self, oldtext, newtext):
         if oldtext == self.text:
@@ -980,8 +1078,7 @@ class Phrase(MultiTerm):
 
     class PhraseScorer(QueryScorer):
         def __repr__(self):
-            return "<%s %r: %r>" % (self.__class__.__name__,
-                                    self.intersection, self.id)
+            return "<%s %r: %r>" % (self.__class__.__name__, self.intersection, self.id)
 
         def reset(self):
             self.intersection.reset()
@@ -1049,14 +1146,14 @@ class Phrase(MultiTerm):
             # Each sub-scorer of the intersection represents a word in the
             # phrase. The positions of each word is therefore the value of the
             # current posting for each sub-scorer.
-            return [scorer.value_as("positions")
-                    for scorer in self.intersection.scorers]
+            return [
+                scorer.value_as("positions") for scorer in self.intersection.scorers
+            ]
 
     class VectorPhraseScorer(PhraseScorer):
         "Scorer for PhraseQuery that uses Position term vectors."
 
-        def __init__(self, reader, fieldnum, words, intersection, slop=1,
-                     boost=1.0):
+        def __init__(self, reader, fieldnum, words, intersection, slop=1, boost=1.0):
             self.reader = reader
             self.fieldnum = fieldnum
             self.words = words
@@ -1084,7 +1181,10 @@ class Phrase(MultiTerm):
                     # Since the term index and term vector can potentially use
                     # different analyzers, it's possible that the words in the
                     # term index might not match the words in the vector.
-                    raise QueryError("Phrase query: %r in term index but not in vector (possible analyzer mismatch)" % word)
+                    raise QueryError(
+                        "Phrase query: %r in term index but not in vector (possible analyzer mismatch)"
+                        % word
+                    )
                 poses[word] = vreader.value_as("positions")
             # Now put the position lists in phrase order
             poses = [poses[word] for word in self.words]
@@ -1106,17 +1206,26 @@ class Phrase(MultiTerm):
         self.boost = boost
 
     def __eq__(self, other):
-        return other and self.__class__ is other.__class__ and\
-        self.fieldname == other.fieldname and self.words == other.word and\
-        self.slop == other.slop and self.boost == other.boost
+        return (
+            other
+            and self.__class__ is other.__class__
+            and self.fieldname == other.fieldname
+            and self.words == other.word
+            and self.slop == other.slop
+            and self.boost == other.boost
+        )
 
     def __repr__(self):
-        return "%s(%r, %r, slop=%s, boost=%f)" % (self.__class__.__name__,
-                                                  self.fieldname, self.words,
-                                                  self.slop, self.boost)
+        return "%s(%r, %r, slop=%s, boost=%f)" % (
+            self.__class__.__name__,
+            self.fieldname,
+            self.words,
+            self.slop,
+            self.boost,
+        )
 
     def __unicode__(self):
-        return u'%s:"%s"' % (self.fieldname, u" ".join(self.words))
+        return '%s:"%s"' % (self.fieldname, " ".join(self.words))
 
     def _all_terms(self, termset, phrases=True):
         if phrases:
@@ -1130,7 +1239,8 @@ class Phrase(MultiTerm):
             fieldnum = ixreader.fieldname_to_num(fieldname)
             for word in self.words:
                 contains = (fieldnum, word) in ixreader
-                if reverse: contains = not contains
+                if reverse:
+                    contains = not contains
                 if contains:
                     termset.add((fieldname, word))
 
@@ -1141,8 +1251,7 @@ class Phrase(MultiTerm):
             return Term(self.fieldname, self.words[0])
 
         words = [w for w in self.words if w is not None]
-        return self.__class__(self.fieldname, words, slop=self.slop,
-                              boost=self.boost)
+        return self.__class__(self.fieldname, words, slop=self.slop, boost=self.boost)
 
     def replace(self, oldtext, newtext):
         def rep(w):
@@ -1151,8 +1260,12 @@ class Phrase(MultiTerm):
             else:
                 return w
 
-        return Phrase(self.fieldname, [rep(w) for w in self.words],
-                      slop=self.slop, boost=self.boost)
+        return Phrase(
+            self.fieldname,
+            [rep(w) for w in self.words],
+            slop=self.slop,
+            boost=self.boost,
+        )
 
     def _and_query(self):
         fn = self.fieldname
@@ -1167,29 +1280,39 @@ class Phrase(MultiTerm):
         # Shortcut the query if one of the words doesn't exist.
         ixreader = searcher.reader()
         for word in self.words:
-            if (fieldnum, word) not in ixreader: return EmptyScorer()
-        
-        wordscorers = [Term(self.fieldname, word).scorer(searcher, exclude_docs=exclude_docs)
-                       for word in self.words]
+            if (fieldnum, word) not in ixreader:
+                return EmptyScorer()
+
+        wordscorers = [
+            Term(self.fieldname, word).scorer(searcher, exclude_docs=exclude_docs)
+            for word in self.words
+        ]
         intersection = IntersectionScorer(wordscorers, boost=self.boost)
         if intersection.id is None:
             return EmptyScorer()
 
         field = searcher.field(fieldnum)
         if field.format and field.format.supports("positions"):
-            return Phrase.PostingPhraseScorer(intersection, slop=self.slop,
-                                              boost=self.boost)
+            return Phrase.PostingPhraseScorer(
+                intersection, slop=self.slop, boost=self.boost
+            )
         elif field.vector and field.vector.supports("positions"):
-            return Phrase.VectorPhraseScorer(ixreader, fieldnum, self.words,
-                                             intersection, slop=self.slop,
-                                             boost=self.boost)
+            return Phrase.VectorPhraseScorer(
+                ixreader,
+                fieldnum,
+                self.words,
+                intersection,
+                slop=self.slop,
+                boost=self.boost,
+            )
         else:
-            raise QueryError("Phrase search: %r field has no positions" % self.fieldname)
+            raise QueryError(
+                "Phrase search: %r field has no positions" % self.fieldname
+            )
 
 
 class Every(Query):
-    """A query that matches every document in the index.
-    """
+    """A query that matches every document in the index."""
 
     class EveryScorer(QueryScorer):
         def __init__(self, limit, exclude, boost):
@@ -1229,11 +1352,10 @@ class Every(Query):
         self.boost = boost
 
     def __eq__(self, other):
-        return other and self.__class__ is other.__class__ and\
-        self.boost == other.boost
+        return other and self.__class__ is other.__class__ and self.boost == other.boost
 
     def __unicode__(self):
-        return u"*"
+        return "*"
 
     def estimate_size(self, ixreader):
         return ixreader.doc_count()
@@ -1241,37 +1363,50 @@ class Every(Query):
     def scorer(self, searcher, exclude_docs=None):
         if not exclude_docs:
             exclude_docs = frozenset()
-        return Every.EveryScorer(searcher.reader().doc_count_all(),
-                                 exclude_docs, self.boost)
+        return Every.EveryScorer(
+            searcher.reader().doc_count_all(), exclude_docs, self.boost
+        )
 
     def docs(self, searcher, exclude_docs=None):
-        alldocs = xrange(searcher.reader().doc_count_all())
-        if exclude_docs is None: exclude_docs = frozenset()
+        alldocs = range(searcher.reader().doc_count_all())
+        if exclude_docs is None:
+            exclude_docs = frozenset()
         return (docnum for docnum in alldocs if docnum not in exclude_docs)
 
     def doc_scores(self, searcher, exclude_docs=None):
-        alldocs = xrange(searcher.reader().doc_count_all())
-        if exclude_docs is None: exclude_docs = frozenset()
-        return ((docnum, self.boost) for docnum in alldocs
-                if docnum not in exclude_docs)
+        alldocs = range(searcher.reader().doc_count_all())
+        if exclude_docs is None:
+            exclude_docs = frozenset()
+        return (
+            (docnum, self.boost) for docnum in alldocs if docnum not in exclude_docs
+        )
 
 
 class NullQuery(Query):
     "Represents a query that won't match anything."
+
     def __call__(self):
         return self
+
     def estimate_size(self, ixreader):
         return 0
+
     def scorer(self, searcher, exclude_docs=None):
         return EmptyScorer()
+
     def normalize(self):
         return self
+
     def simplify(self, ixreader):
         return self
+
     def docs(self, searcher, exclude_docs=None):
         return []
+
     def doc_scores(self, searcher, exclude_docs=None):
         return []
+
+
 NullQuery = NullQuery()
 
 
@@ -1281,6 +1416,7 @@ NullQuery = NullQuery()
 # You probably don't want to use these
 #
 # ===========================================================================================
+
 
 class Require(CompoundQuery):
     """Binary query returns results from the first query that also appear in
@@ -1306,8 +1442,10 @@ class Require(CompoundQuery):
 
     def scorer(self, searcher, exclude_docs=None):
         scored, required = self.subqueries
-        scorer = RequireScorer(scored.scorer(searcher, exclude_docs=exclude_docs),
-                               required.scorer(searcher, exclude_docs=exclude_docs))
+        scorer = RequireScorer(
+            scored.scorer(searcher, exclude_docs=exclude_docs),
+            required.scorer(searcher, exclude_docs=exclude_docs),
+        )
         return scorer
 
     def normalize(self):
@@ -1343,8 +1481,10 @@ class AndMaybe(CompoundQuery):
 
     def scorer(self, searcher, exclude_docs=None):
         required, optional = self.subqueries
-        scorer = AndMaybeScorer(required.scorer(searcher, exclude_docs=exclude_docs),
-                                optional.scorer(searcher, exclude_docs=exclude_docs))
+        scorer = AndMaybeScorer(
+            required.scorer(searcher, exclude_docs=exclude_docs),
+            optional.scorer(searcher, exclude_docs=exclude_docs),
+        )
         return scorer
 
     def normalize(self):
@@ -1377,18 +1517,19 @@ class AndNot(Query):
         self.boost = boost
 
     def __eq__(self, other):
-        return (other
-                and self.__class__ is other.__class__
-                and self.positive == other.positive
-                and self.negative == other.negative
-                and self.boost == other.boost)
+        return (
+            other
+            and self.__class__ is other.__class__
+            and self.positive == other.positive
+            and self.negative == other.negative
+            and self.boost == other.boost
+        )
 
     def __repr__(self):
-        return "%s(%r, %r)" % (self.__class__.__name__,
-                               self.positive, self.negative)
+        return "%s(%r, %r)" % (self.__class__.__name__, self.positive, self.negative)
 
     def __unicode__(self):
-        return u"%s ANDNOT %s" % (self.postive, self.negative)
+        return "%s ANDNOT %s" % (self.postive, self.negative)
 
     def normalize(self):
         pos = self.positive.normalize()
@@ -1402,16 +1543,19 @@ class AndNot(Query):
         return AndNot(pos, neg, boost=self.boost)
 
     def replace(self, oldtext, newtext):
-        return AndNot(self.positive.replace(oldtext, newtext),
-                      self.negative.replace(oldtext, newtext),
-                      boost=self.boost)
+        return AndNot(
+            self.positive.replace(oldtext, newtext),
+            self.negative.replace(oldtext, newtext),
+            boost=self.boost,
+        )
 
     def _all_terms(self, termset, phrases=True):
         self.positive.all_terms(termset, phrases=phrases)
 
     def _existing_terms(self, ixreader, termset, reverse=False, phrases=True):
-        self.positive.existing_terms(ixreader, termset, reverse=reverse,
-                                     phrases=phrases)
+        self.positive.existing_terms(
+            ixreader, termset, reverse=reverse, phrases=phrases
+        )
 
     def scorer(self, searcher, exclude_docs=None):
         notvector = _not_vector(searcher, [self.negative], exclude_docs)
@@ -1420,15 +1564,3 @@ class AndNot(Query):
 
 def BooleanQuery(required, should, prohibited):
     return AndNot(AndMaybe(And(required), Or(should)), Or(prohibited)).normalize()
-
-
-
-
-
-
-
-
-
-
-
-

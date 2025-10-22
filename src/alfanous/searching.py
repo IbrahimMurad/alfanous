@@ -17,11 +17,11 @@
 ##     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from alfanous.results_processing import QSort, QScore
+from alfanous.results_processing import QScore, QSort
 
 
 class QReader:
-    """ reader of the index """
+    """reader of the index"""
 
     def __init__(self, docindex):
         self.reader = docindex.get_index().reader()
@@ -29,7 +29,6 @@ class QReader:
 
     def list_values(self, fieldname):
         return set(self.reader.field_terms(fieldname))
-
 
     def list_terms(self, fieldname=None, double=False):
         """
@@ -46,12 +45,11 @@ class QReader:
                     prec.append(value)
                     yield value
 
-
     def term_stats(self, terms):
-        """ return all statistiques of a term
-         - document frequency
-         - matches frequency
-         """
+        """return all statistiques of a term
+        - document frequency
+        - matches frequency
+        """
         for term in terms:
             lst = list(term)
             lst.extend([self.reader.frequency(*term), self.reader.doc_frequency(*term)])
@@ -59,7 +57,7 @@ class QReader:
 
 
 class QSearcher:
-    """ search"""
+    """search"""
 
     def __init__(self, docindex, qparser):
         self._searcher = docindex.get_index().searcher
@@ -72,7 +70,7 @@ class QSearcher:
         terms = set()
         try:
             query.all_terms(terms)
-        except:
+        except Exception:
             pass
 
         return results, terms, searcher

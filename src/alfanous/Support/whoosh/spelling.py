@@ -1,18 +1,18 @@
-#===============================================================================
+# ===============================================================================
 # Copyright 2007 Matt Chaput
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #    http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#===============================================================================
+# ===============================================================================
 
 """This module contains functions/classes using a Whoosh index as a backend for
 a spell-checking engine.
@@ -20,33 +20,39 @@ a spell-checking engine.
 
 from collections import defaultdict
 
-from alfanous.Support.whoosh import analysis, fields, query
+from alfanous.Support.whoosh import analysis, query
 from alfanous.Support.whoosh.scoring import TF_IDF
-from alfanous.Support.whoosh.support.levenshtein import relative, distance
+from alfanous.Support.whoosh.support.levenshtein import distance
 
 
 class SpellChecker(object):
     """Implements a spell-checking engine using a search index for the backend
     storage and lookup. This class is based on the Lucene contributed spell-
     checker code.
-    
+
     To use this object::
-    
+
         st = store.FileStorage("spelldict")
         sp = SpellChecker(st)
-        
+
         sp.add_words([u"aardvark", u"manticore", u"zebra", ...])
         # or
         ix = index.open_dir("index")
         sp.add_field(ix, "content")
-        
+
         suggestions = sp.suggest(u"ardvark", number = 2)
     """
 
-    def __init__(self, storage, indexname="SPELL",
-                 booststart=2.0, boostend=1.0,
-                 mingram=3, maxgram=4,
-                 minscore=0.5):
+    def __init__(
+        self,
+        storage,
+        indexname="SPELL",
+        booststart=2.0,
+        boostend=1.0,
+        mingram=3,
+        maxgram=4,
+        minscore=0.5,
+    ):
         """
         :param storage: The storage object in which to create the
             spell-checker's dictionary index.
@@ -77,7 +83,8 @@ class SpellChecker(object):
         didn't already exist).
         """
 
-        import index
+        from alfanous.Support.whoosh import index
+
         if create or not self._index:
             create = create or not index.exists(self.storage, indexname=self.indexname)
             if create:
@@ -89,17 +96,25 @@ class SpellChecker(object):
     def _schema(self):
         # Creates a schema given this object's mingram and maxgram attributes.
 
-        from fields import Schema, FieldType, Frequency, ID, STORED
-        from analysis import SimpleAnalyzer
+        from alfanous.Support.whoosh.analysis import SimpleAnalyzer
+        from alfanous.Support.whoosh.fields import (
+            ID,
+            STORED,
+            FieldType,
+            Frequency,
+            Schema,
+        )
 
         idtype = ID()
         freqtype = FieldType(format=Frequency(SimpleAnalyzer()))
 
         fls = [("word", STORED), ("score", STORED)]
-        for size in xrange(self.mingram, self.maxgram + 1):
-            fls.extend([("start%s" % size, idtype),
-                        ("end%s" % size, idtype),
-                        ("gram%s" % size, freqtype)])
+        for size in range(self.mingram, self.maxgram + 1):
+            fls.extend([
+                ("start%s" % size, idtype),
+                ("end%s" % size, idtype),
+                ("gram%s" % size, freqtype),
+            ])
 
         return Schema(**dict(fls))
 
@@ -110,15 +125,15 @@ class SpellChecker(object):
         :meth:`SpellChecker.add_field` or :meth:`SpellChecker.add_scored_words`,
         and 'weight' is the score the word received in the search for the
         original word's ngrams.
-        
+
         You must add words to the dictionary (using add_field, add_words,
         and/or add_scored_words) before you can use this.
-        
+
         This is a lower-level method, in case an expert user needs access to
         the raw scores, for example to implement a custom suggestion ranking
         algorithm. Most people will want to call :meth:`~SpellChecker.suggest`
         instead, which simply returns the top N valued words.
-        
+
         :param text: The word to check.
         :rtype: list
         """
@@ -127,20 +142,22 @@ class SpellChecker(object):
             weighting = TF_IDF()
 
         grams = defaultdict(list)
-        for size in xrange(self.mingram, self.maxgram + 1):
+        for size in range(self.mingram, self.maxgram + 1):
             key = "gram%s" % size
             nga = analysis.NgramAnalyzer(size)
             for t in nga(text):
                 grams[key].append(t.text)
 
         queries = []
-        for size in xrange(self.mingram, min(self.maxgram + 1, len(text))):
+        for size in range(self.mingram, min(self.maxgram + 1, len(text))):
             key = "gram%s" % size
             gramlist = grams[key]
-            queries.append(query.Term("start%s" % size, gramlist[0],
-                                      boost=self.booststart))
-            queries.append(query.Term("end%s" % size, gramlist[-1],
-                                      boost=self.boostend))
+            queries.append(
+                query.Term("start%s" % size, gramlist[0], boost=self.booststart)
+            )
+            queries.append(
+                query.Term("end%s" % size, gramlist[-1], boost=self.boostend)
+            )
             for gram in gramlist:
                 queries.append(query.Term(key, gram))
 
@@ -149,9 +166,11 @@ class SpellChecker(object):
         s = ix.searcher(weighting=weighting)
         try:
             result = s.search(q)
-            return [(fs["word"], fs["score"], result.score(i))
-                    for i, fs in enumerate(result)
-                    if fs["word"] != text]
+            return [
+                (fs["word"], fs["score"], result.score(i))
+                for i, fs in enumerate(result)
+                if fs["word"] != text
+            ]
         finally:
             s.close()
 
@@ -159,7 +178,7 @@ class SpellChecker(object):
         """Returns a list of suggested alternative spellings of 'text'. You
         must add words to the dictionary (using add_field, add_words, and/or
         add_scored_words) before you can use this.
-        
+
         :param text: The word to check.
         :param number: The maximum number of suggestions to return.
         :param usescores: Use the per-word score to influence the suggestions.
@@ -167,9 +186,12 @@ class SpellChecker(object):
         """
 
         if usescores:
+
             def keyfn(a):
                 return 0 - (1 / distance(text, a[0])) * a[1]
+
         else:
+
             def keyfn(a):
                 return distance(text, a[0])
 
@@ -183,7 +205,7 @@ class SpellChecker(object):
         frequency as the score. As a result, more common words will be
         suggested before rare words. If you want to calculate the scores
         differently, use add_scored_words() directly.
-        
+
         :param ix: The index.Index object from which to add terms.
         :param fieldname: The field name (or number) of a field in the source
             index. All the indexed terms from this field will be added to the
@@ -192,14 +214,13 @@ class SpellChecker(object):
 
         r = ix.reader()
         try:
-            self.add_scored_words((w, freq)
-                                  for w, _, freq in r.iter_field(fieldname))
+            self.add_scored_words((w, freq) for w, _, freq in r.iter_field(fieldname))
         finally:
             r.close()
 
     def add_words(self, ws, score=1):
         """Adds a list of words to the backend dictionary.
-        
+
         :param ws: A sequence of words (strings) to add to the dictionary.
         :param score: An optional score to use for ALL the words in 'ws'.
         """
@@ -210,14 +231,14 @@ class SpellChecker(object):
         Associating words with a score lets you use the 'usescores' keyword
         argument of the suggest() method to order the suggestions using the
         scores.
-        
+
         :param ws: A sequence of ("word", score) tuples.
         """
 
         writer = self.index().writer()
         for text, score in ws:
             fields = {"word": text, "score": score}
-            for size in xrange(self.mingram, self.maxgram + 1):
+            for size in range(self.mingram, self.maxgram + 1):
                 nga = analysis.NgramAnalyzer(size)
                 gramlist = [t.text for t in nga(text)]
                 if len(gramlist) > 0:
@@ -228,9 +249,5 @@ class SpellChecker(object):
         writer.commit()
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     pass
-
-
-

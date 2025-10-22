@@ -102,7 +102,10 @@ class QuranicCorpusImporter:
 
         A = QC(source=QC_PATH)
         print(".OK\n")
-        IFEXIST = lambda d, attrib: d[attrib].encode("utf-8") if attrib in d else ""
+
+        def IFEXIST(d, attrib):
+            return d[attrib].encode("utf-8") if attrib in d else ""
+
         gid, word_gid = 0, 0
         (print(">inserting values of gid..."),)
         for iteration in A.all_words_generator():
@@ -121,15 +124,13 @@ class QuranicCorpusImporter:
                 uthmani_symbols=True,
             )
 
-            QUERY = (
-                lambda d,
-                glob: """insert into wordQC(gid,word_gid,word_id,aya_id,sura_id,'order',token,arabictoken,prefixes, suffixes,type,pos,arabicpos,mood,
+            def QUERY(d, glob):
+                return """insert into wordQC(gid,word_gid,word_id,aya_id,sura_id,'order',token,arabictoken,prefixes, suffixes,type,pos,arabicpos,mood,
                 arabicmood, 'case', arabiccase, root ,arabicroot, lemma ,arabiclemma, special, arabicspecial,
                 word,normalised,spelled, derivation, form ,gender, person, number,voice, state, aspect) values
                 ("%(gid)d","%(word_gid)d","%(word_id)d","%(aya_id)d","%(sura_id)d","%(order)d","%(token)s","%(arabictoken)s", "%(prefixes)s", "%(suffixes)s",  "%(type)s","%(pos)s","%(arabicpos)s","%(mood)s","%(arabicmood)s",
                 "%(case)s","%(arabiccase)s","%(root)s","%(arabicroot)s","%(lemma)s","%(arabiclemma)s","%(special)s","%(arabicspecial)s","%(word)s","%(normalised)s","%(spelled)s",
-                "%(derivation)s","%(form)s","%(gender)s","%(person)s","%(number)s","%(voice)s","%(state)s","%(aspect)s")"""
-                % {
+                "%(derivation)s","%(form)s","%(gender)s","%(person)s","%(number)s","%(voice)s","%(state)s","%(aspect)s")""" % {
                     "gid": gid,
                     "word_gid": word_gid,
                     "word_id": iteration["word_id"],
@@ -171,7 +172,7 @@ class QuranicCorpusImporter:
                     "state": IFEXIST(d, "state"),
                     "aspect": IFEXIST(d, "aspect"),
                 }
-            )
+
             word_gid += 1
             if word_gid % 1000 == 0:
                 (print(word_gid),)
@@ -222,8 +223,8 @@ class ZekrModelsImporter:
 
         """
         searcher = self.index.searcher()
-        results = searcher.find("id", unicode(id))
-        l = len(results)
+        results = searcher.find("id", str(id))
+        l = len(results)  # noqa: E741
         if l == 6236:
             return True
         elif l == 0:

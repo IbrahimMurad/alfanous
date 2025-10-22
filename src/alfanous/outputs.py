@@ -1,6 +1,6 @@
 #!/usr/bin/python2
 # -*- coding: UTF-8 -*-
-
+# ruff: noqa: F405, F841
 
 """
 The programming interface, responsible of the output of all results
@@ -11,12 +11,15 @@ import re
 from pyparsing import ParseException
 
 from alfanous.constants import LANGS
-from alfanous.data import *
+from alfanous.data import *  # noqa: F403
 from alfanous.misc import FILTER_DOUBLES, FIND, LOCATE
 from alfanous.romanization import transliterate
 from alfanous.text_processing import QArabicSymbolsFilter
 
-STANDARD2UTHMANI = lambda x: std2uth_words[x] if std2uth_words.has_key(x) else x
+
+def STANDARD2UTHMANI(x):
+    return std2uth_words[x] if x in std2uth_words else x
+
 
 FALSE_PATTERN = "^false|no|off|0$"
 
@@ -255,7 +258,7 @@ class Raw:
         self._defaults = self.DEFAULTS
         self._flags = self.DEFAULTS["flags"].keys()
         self._fields = Fields
-        self._fields_reverse = dict((v, k) for k, v in Fields.iteritems())
+        self._fields_reverse = dict((v, k) for k, v in Fields.items())
         self._roots = sorted(filter(bool, set(derivedict["root"])))
         self._errors = self.ERRORS
         self._domains = self.DOMAINS
@@ -399,8 +402,8 @@ class Raw:
         )
         # preprocess query
         query = query.replace("\\", "")
-        if not isinstance(query, unicode):
-            query = unicode(query, "utf8")
+        if not isinstance(query, str):
+            query = str(query, "utf8")
         try:
             output = self.QSE.suggest_all(query)
         except Exception:
@@ -589,13 +592,11 @@ class Raw:
         # print query
         # preprocess query
         query = query.replace("\\", "")
-        if not isinstance(query, unicode):
-            query = unicode(query, "utf8")
+        if not isinstance(query, str):
+            query = str(query, "utf8")
 
         if ":" not in query:
-            query = unicode(
-                transliterate("buckwalter", query, ignore="'_\"%*?#~[]{}:>+-|")
-            )
+            query = str(transliterate("buckwalter", query, ignore="'_\"%*?#~[]{}:>+-|"))
 
         # Search
         SE = self.FQSE if fuzzy else self.QSE
@@ -633,19 +634,27 @@ class Raw:
         strip_vocalization = QArabicSymbolsFilter(
             shaping=False, tashkil=True, spellerrors=False, hamza=False
         ).normalize_all
+
         # highligh function that consider None value and non-definition
-        H = (
-            lambda X: self.QSE.highlight(X, terms, highlight)
-            if highlight != "none" and X
-            else X
-            if X
-            else "-----"
-        )
+        def H(X):
+            return (
+                self.QSE.highlight(X, terms, highlight)
+                if highlight != "none" and X
+                else X
+                if X
+                else "-----"
+            )
+
         # Numbers are 0 if not defined
-        N = lambda X: X if X else 0
+        def N(X):
+            return X if X else 0
+
         # parse keywords lists , used for Sura names
         kword = re.compile("[^,،]+")
-        keywords = lambda phrase: kword.findall(phrase)
+
+        def keywords(phrase):
+            return kword.findall(phrase)
+
         ##########################################
         extend_runtime = res.runtime
         # Words & Annotations
@@ -743,19 +752,19 @@ class Raw:
 
             for r in reslist:
                 if prev_aya:
-                    adja_query += " OR gid:%s " % unicode(r["gid"] - 1)
+                    adja_query += " OR gid:%s " % str(r["gid"] - 1)
                 if next_aya:
-                    adja_query += " OR gid:%s " % unicode(r["gid"] + 1)
+                    adja_query += " OR gid:%s " % str(r["gid"] + 1)
                 if translation:
-                    trad_query += " OR gid:%s " % unicode(r["gid"])
+                    trad_query += " OR gid:%s " % str(r["gid"])
                 if annotation_aya:
                     annotation_aya_query += " OR  ( aya_id:%s AND  sura_id:%s ) " % (
-                        unicode(r["aya_id"]),
-                        unicode(r["sura_id"]),
+                        str(r["aya_id"]),
+                        str(r["sura_id"]),
                     )
 
             adja_query += " )"
-            trad_query += " )" + " AND id:%s " % unicode(translation)
+            trad_query += " )" + " AND id:%s " % str(translation)
             annotation_aya_query += " )"
 
         # Adjacents
@@ -844,7 +853,7 @@ class Raw:
 
         ## merge word annotations to word output
         if annotation_word and word_info:
-            for cpt in xrange(1, len(output["words"]["individual"]) + 1):
+            for cpt in range(1, len(output["words"]["individual"]) + 1):
                 current_word = STANDARD2UTHMANI(
                     output["words"]["individual"][cpt]["word"]
                 )
@@ -1024,8 +1033,8 @@ class Raw:
             aya = IS_FLAG(flags, "aya")
         # preprocess query
         query = query.replace("\\", "")
-        if not isinstance(query, unicode):
-            query = unicode(query, "utf8")
+        if not isinstance(query, str):
+            query = str(query, "utf8")
 
         # Search
         SE = self.TSE
@@ -1064,15 +1073,19 @@ class Raw:
         output = {}
 
         # highligh function that consider None value and non-definition
-        H = (
-            lambda X: SE.highlight(X, terms, highlight)
-            if highlight != "none" and X
-            else X
-            if X
-            else "-----"
-        )
+        def H(X):
+            return (
+                SE.highlight(X, terms, highlight)
+                if highlight != "none" and X
+                else X
+                if X
+                else "-----"
+            )
+
         # Numbers are 0 if not defined
-        N = lambda X: X if X else 0
+        def N(X):
+            return X if X else 0
+
         extend_runtime = res.runtime
 
         # Magic_loop to built queries of ayas,etc in the same time
@@ -1080,7 +1093,7 @@ class Raw:
             aya_query = "( 0"
             for r in reslist:
                 if aya:
-                    aya_query += " OR gid:%s " % unicode(r["gid"])
+                    aya_query += " OR gid:%s " % r["gid"]
             aya_query += " )"
 
         # original ayas
@@ -1195,13 +1208,11 @@ class Raw:
             aya = IS_FLAG(flags, "aya")
         # preprocess query
         query = query.replace("\\", "")
-        if not isinstance(query, unicode):
-            query = unicode(query, "utf8")
+        if not isinstance(query, str):
+            query = str(query, "utf8")
 
         if ":" not in query:
-            query = unicode(
-                transliterate("buckwalter", query, ignore="'_\"%*?#~[]{}:>+-|")
-            )
+            query = str(transliterate("buckwalter", query, ignore="'_\"%*?#~[]{}:>+-|"))
 
         # Search
         SE = self.WSE
@@ -1244,14 +1255,17 @@ class Raw:
             "shadda": True,
             "uthmani_symbols": True,
         }).normalize_all
+
         # highligh function that consider None value and non-definition
-        H = (
-            lambda X: SE.highlight(X, terms, highlight)
-            if highlight != "none" and X
-            else X
-            if X
-            else "-----"
-        )
+        def H(X):
+            return (
+                SE.highlight(X, terms, highlight)
+                if highlight != "none" and X
+                else X
+                if X
+                else "-----"
+            )
+
         extend_runtime = res.runtime
         # Words & Annotations
         words_output = {"individual": {}}
@@ -1285,8 +1299,8 @@ class Raw:
             for r in reslist:
                 if aya:
                     aya_query += " OR ( sura_id:%s AND aya_id:%s )  " % (
-                        unicode(r["sura_id"]),
-                        unicode(r["aya_id"]),
+                        r["sura_id"],
+                        r["aya_id"],
                     )
             aya_query += " )"
 

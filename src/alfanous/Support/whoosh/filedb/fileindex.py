@@ -1,33 +1,36 @@
-#===============================================================================
+# ===============================================================================
 # Copyright 2009 Matt Chaput
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #    http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#===============================================================================
+# ===============================================================================
 
-import cPickle, re
+import pickle
+import re
 from bisect import bisect_right
-from time import time
 from threading import Lock
+from time import time
 
 from alfanous.Support.whoosh import __version__
 from alfanous.Support.whoosh.fields import Schema
-from alfanous.Support.whoosh.index import Index
-from alfanous.Support.whoosh.index import EmptyIndexError, OutOfDateError, IndexVersionError
-from alfanous.Support.whoosh.index import _DEF_INDEX_NAME
+from alfanous.Support.whoosh.index import (
+    _DEF_INDEX_NAME,
+    EmptyIndexError,
+    Index,
+    IndexVersionError,
+    OutOfDateError,
+)
 from alfanous.Support.whoosh.store import LockError
-from alfanous.Support.whoosh.support.bitvector import BitVector
-from alfanous.Support.whoosh.system import _INT_SIZE, _FLOAT_SIZE
-
+from alfanous.Support.whoosh.system import _FLOAT_SIZE, _INT_SIZE
 
 _INDEX_VERSION = -105
 _EXTENSIONS = "dci|dcz|tiz|fvz|pst|vps"
@@ -37,17 +40,16 @@ _EXTENSIONS = "dci|dcz|tiz|fvz|pst|vps"
 # documents from self.segments. These methods are on IndexWriter as
 # well as Index for convenience, so they're broken out here.
 
+
 class SegmentDeletionMixin(object):
-    """Mix-in for classes that support deleting documents from self.segments.
-    """
+    """Mix-in for classes that support deleting documents from self.segments."""
 
     def delete_document(self, docnum, delete=True):
         """Deletes a document by number."""
         self.segments.delete_document(docnum, delete=delete)
 
     def deleted_count(self):
-        """Returns the total number of deleted documents in this index.
-        """
+        """Returns the total number of deleted documents in this index."""
         return self.segments.deleted_count()
 
     def is_deleted(self, docnum):
@@ -64,8 +66,7 @@ class SegmentDeletionMixin(object):
 
 
 class FileIndex(SegmentDeletionMixin, Index):
-    def __init__(self, storage, schema, create=False,
-                 indexname=_DEF_INDEX_NAME):
+    def __init__(self, storage, schema, create=False, indexname=_DEF_INDEX_NAME):
         self.storage = storage
         self.indexname = indexname
 
@@ -93,7 +94,9 @@ class FileIndex(SegmentDeletionMixin, Index):
         elif self.generation >= 0:
             self._read(schema)
         else:
-            raise EmptyIndexError("No index named %r in storage %r" % (indexname, storage))
+            raise EmptyIndexError(
+                "No index named %r in storage %r" % (indexname, storage)
+            )
 
         # Open a reader for this index. This is used by the
         # deletion methods, but mostly it's to keep the underlying
@@ -103,13 +106,14 @@ class FileIndex(SegmentDeletionMixin, Index):
         self.segment_num_lock = Lock()
 
     def __repr__(self):
-        return "%s(%r, %r)" % (self.__class__.__name__,
-                               self.storage, self.indexname)
+        return "%s(%r, %r)" % (self.__class__.__name__, self.storage, self.indexname)
 
     def __del__(self):
-        if (hasattr(self, "_searcher")
+        if (
+            hasattr(self, "_searcher")
             and self._searcher
-            and not self._searcher.is_closed):
+            and not self._searcher.is_closed
+        ):
             self._searcher.close()
 
     def close(self):
@@ -123,13 +127,13 @@ class FileIndex(SegmentDeletionMixin, Index):
             m = pattern.match(filename)
             if m:
                 num = int(m.group(1))
-                if num > max: max = num
+                if num > max:
+                    max = num
         return max
 
     def refresh(self):
         if not self.up_to_date():
-            return self.__class__(self.storage, self.schema,
-                                  indexname=self.indexname)
+            return self.__class__(self.storage, self.schema, indexname=self.indexname)
         else:
             return self
 
@@ -140,11 +144,11 @@ class FileIndex(SegmentDeletionMixin, Index):
         # Writes the content of this index to the .toc file.
         for field in self.schema:
             field.clean()
-        #stream = self.storage.create_file(self._toc_filename())
+        # stream = self.storage.create_file(self._toc_filename())
 
         # Use a temporary file for atomic write.
         tocfilename = self._toc_filename()
-        tempfilename = '%s.%s' % (tocfilename, time())
+        tempfilename = "%s.%s" % (tocfilename, time())
         stream = self.storage.create_file(tempfilename)
 
         stream.write_varint(_INT_SIZE)
@@ -155,7 +159,7 @@ class FileIndex(SegmentDeletionMixin, Index):
         for num in __version__[:3]:
             stream.write_varint(num)
 
-        stream.write_string(cPickle.dumps(self.schema, -1))
+        stream.write_string(pickle.dumps(self.schema, -1))
         stream.write_int(self.generation)
         stream.write_int(self.segment_counter)
         stream.write_pickle(self.segments)
@@ -167,10 +171,16 @@ class FileIndex(SegmentDeletionMixin, Index):
     def _read(self, schema):
         # Reads the content of this index from the .toc file.
         stream = self.storage.open_file(self._toc_filename())
+        stream_int_size = stream.read_varint()
+        stream_float_size = stream.read_varint()
 
-        if stream.read_varint() != _INT_SIZE or \
-           stream.read_varint() != _FLOAT_SIZE:
-            raise IndexError("Index was created on an architecture with different data sizes")
+        if stream_int_size != _INT_SIZE or stream_float_size != _FLOAT_SIZE:
+            raise IndexError(
+                "Index was created on an architecture with different data sizes\n"
+                f"Expected: {_INT_SIZE} and {_FLOAT_SIZE}\n"
+                f"Got: {stream_int_size} and {stream_float_size}\n"
+                f"File: {stream._name}\n"
+            )
 
         if not stream.read_int() == -12345:
             raise IndexError("Number misread: byte order problem")
@@ -179,9 +189,11 @@ class FileIndex(SegmentDeletionMixin, Index):
         if version != _INDEX_VERSION:
             raise IndexVersionError("Can't read format %s" % version, version)
         self.version = version
-        self.release = (stream.read_varint(),
-                        stream.read_varint(),
-                        stream.read_varint())
+        self.release = (
+            stream.read_varint(),
+            stream.read_varint(),
+            stream.read_varint(),
+        )
 
         # If the user supplied a schema object with the constructor, don't load
         # the pickled schema from the saved index.
@@ -189,7 +201,7 @@ class FileIndex(SegmentDeletionMixin, Index):
             self.schema = schema
             stream.skip_string()
         else:
-            self.schema = cPickle.loads(stream.read_string())
+            self.schema = pickle.loads(stream.read_string())
 
         generation = stream.read_int()
         assert generation == self.generation
@@ -198,7 +210,7 @@ class FileIndex(SegmentDeletionMixin, Index):
         stream.close()
 
     def _next_segment_name(self):
-        #Returns the name of the next segment in sequence.
+        # Returns the name of the next segment in sequence.
         if self.segment_num_lock.acquire():
             try:
                 self.segment_counter += 1
@@ -224,6 +236,7 @@ class FileIndex(SegmentDeletionMixin, Index):
             return
 
         from whoosh.filedb.filewriting import OPTIMIZE
+
         w = self.writer()
         w.commit(OPTIMIZE)
 
@@ -235,7 +248,10 @@ class FileIndex(SegmentDeletionMixin, Index):
 
         if new_segments:
             if not isinstance(new_segments, SegmentSet):
-                raise ValueError("FileIndex.commit() called with something other than a SegmentSet: %r" % new_segments)
+                raise ValueError(
+                    "FileIndex.commit() called with something other than a SegmentSet: %r"
+                    % new_segments
+                )
             self.segments = new_segments
 
         self.generation += 1
@@ -292,10 +308,12 @@ class FileIndex(SegmentDeletionMixin, Index):
 
     def writer(self, **kwargs):
         from alfanous.Support.whoosh.filedb.filewriting import FileIndexWriter
+
         return FileIndexWriter(self, **kwargs)
 
 
 # SegmentSet object
+
 
 class SegmentSet(object):
     """This class is never instantiated by the user. It is used by the Index
@@ -337,7 +355,8 @@ class SegmentSet(object):
         """
 
         offsets = self._doc_offsets
-        if len(offsets) == 1: return 0
+        if len(offsets) == 1:
+            return 0
         return bisect_right(offsets, docnum) - 1
 
     def _segment_and_docnum(self, docnum):
@@ -377,7 +396,6 @@ class SegmentSet(object):
         """
         return sum(s.doc_count() for s in self.segments)
 
-
     def has_deletions(self):
         """
         :returns: True if this index has documents that are marked deleted but
@@ -413,13 +431,14 @@ class SegmentSet(object):
 
     def reader(self, storage, schema):
         from alfanous.Support.whoosh.filedb.filereading import SegmentReader
+
         segments = self.segments
         if len(segments) == 1:
             return SegmentReader(storage, segments[0], schema)
         else:
             from alfanous.Support.whoosh.reading import MultiReader
-            readers = [SegmentReader(storage, segment, schema)
-                       for segment in segments]
+
+            readers = [SegmentReader(storage, segment, schema) for segment in segments]
             return MultiReader(readers, self._doc_offsets, schema)
 
 
@@ -427,7 +446,7 @@ class Segment(object):
     """Do not instantiate this object directly. It is used by the Index object
     to hold information about a segment. A list of objects of this class are
     pickled as part of the TOC file.
-    
+
     The TOC file stores a minimal amount of information -- mostly a list of
     Segment objects. Segments are the real reverse indexes. Having multiple
     segments allows quick incremental indexing: just create a new segment for
@@ -470,9 +489,7 @@ class Segment(object):
             deleted = set(self.deleted)
         else:
             deleted = None
-        return Segment(self.name, self.max_doc,
-                       self.field_length_totals,
-                       deleted)
+        return Segment(self.name, self.max_doc, self.field_length_totals, deleted)
 
     def doc_count_all(self):
         """
@@ -497,7 +514,8 @@ class Segment(object):
         """
         :returns: the total number of deleted documents in this segment.
         """
-        if self.deleted is None: return 0
+        if self.deleted is None:
+            return 0
         return len(self.deleted)
 
     def field_length(self, fieldnum):
@@ -520,8 +538,9 @@ class Segment(object):
             if self.deleted is None:
                 self.deleted = set()
             elif docnum in self.deleted:
-                raise KeyError("Document %s in segment %r is already deleted"
-                               % (docnum, self.name))
+                raise KeyError(
+                    "Document %s in segment %r is already deleted" % (docnum, self.name)
+                )
 
             self.deleted.add(docnum)
         else:
@@ -533,11 +552,13 @@ class Segment(object):
     def is_deleted(self, docnum):
         """:returns: True if the given document number is deleted."""
 
-        if self.deleted is None: return False
+        if self.deleted is None:
+            return False
         return docnum in self.deleted
 
 
 # Utility functions
+
 
 def _toc_pattern(indexname):
     """Returns a regular expression object that matches TOC filenames.
@@ -546,32 +567,10 @@ def _toc_pattern(indexname):
 
     return re.compile("_%s_([0-9]+).toc" % indexname)
 
+
 def _segment_pattern(indexname):
     """Returns a regular expression object that matches segment filenames.
     name is the name of the index.
     """
 
     return re.compile("(_%s_[0-9]+).(%s)" % (indexname, _EXTENSIONS))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

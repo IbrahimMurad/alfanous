@@ -3,12 +3,27 @@
 
 import re
 
-from alfanous.Support.whoosh.analysis import StopFilter, RegexTokenizer  # LowercaseFilter, StandardAnalyzer,
-from alfanous.Support.PyArabic.araby import strip_tashkeel, strip_tatweel, strip_shadda, normalize_spellerrors, \
-    normalize_hamza, normalize_lamalef, normalize_uthmani_symbols  # , HARAKAT_pat,
-from alfanous.Support.PyArabic.araby import FATHATAN, DAMMATAN, KASRATAN, FATHA, DAMMA, KASRA, SUKUN, SHADDA  # *
-
 from alfanous.constants import INVERTEDSHAPING
+from alfanous.Support.PyArabic.araby import (  # *
+    DAMMA,
+    DAMMATAN,
+    FATHA,
+    FATHATAN,
+    KASRA,
+    KASRATAN,
+    SHADDA,
+    SUKUN,
+    normalize_hamza,  # , HARAKAT_pat,
+    normalize_lamalef,
+    normalize_spellerrors,
+    normalize_uthmani_symbols,
+    strip_tashkeel,
+    strip_tatweel,
+)
+from alfanous.Support.whoosh.analysis import (  # LowercaseFilter, StandardAnalyzer,
+    RegexTokenizer,
+    StopFilter,
+)
 
 
 class QSpaceTokenizer(RegexTokenizer):
@@ -19,20 +34,30 @@ class QSpaceTokenizer(RegexTokenizer):
 class QAffixesTokenizer(QSpaceTokenizer):
     def __init__(self, expression=r"[^ \t\r\n]+"):
         super(QAffixesTokenizer, self).__init__(expression=expression)
-        raise NotImplemented()
+        raise NotImplementedError()
 
 
 class QStopFilter(StopFilter):
-    """ استبعاد بعض الكلمات  """
+    """استبعاد بعض الكلمات"""
 
     def __init__(self, stoplist=[], minsize=2, renumber=False):
-        super(QStopFilter, self).__init__(stoplist=stoplist, minsize=minsize, renumber=renumber)
+        super(QStopFilter, self).__init__(
+            stoplist=stoplist, minsize=minsize, renumber=renumber
+        )
 
 
-class QArabicSymbolsFilter():
-    """        """
+class QArabicSymbolsFilter:
+    """ """
 
-    def __init__(self, shaping=True, tashkil=True, spellerrors=False, hamza=False, shadda=False, uthmani_symbols=False):
+    def __init__(
+        self,
+        shaping=True,
+        tashkil=True,
+        spellerrors=False,
+        hamza=False,
+        shadda=False,
+        uthmani_symbols=False,
+    ):
         self._shaping = shaping
         self._tashkil = tashkil
         self._spellerrors = spellerrors
@@ -66,14 +91,14 @@ class QArabicSymbolsFilter():
 
 
 def Gword_tamdid(aya):
-    """ add a tamdid to lafdh aljalala to eliminate the double vocalization """
-    return aya.replace(u"لَّه", u"لَّـه").replace(u"لَّه", u"لَّـه")
+    """add a tamdid to lafdh aljalala to eliminate the double vocalization"""
+    return aya.replace("لَّه", "لَّـه").replace("لَّه", "لَّـه")
 
 
-class unicode_(unicode):
-    """    a subclass of unicode that handle al-tashkil
+class unicode_(str):
+    """a subclass of unicode that handle al-tashkil
     @deprecated: its not well organized
-     """
+    """
 
     def __eq__(self, other):
         return self.shakl_compare(self, other)
@@ -83,7 +108,7 @@ class unicode_(unicode):
         """"""
         output = ""
         for char in text:
-            if INVERTEDSHAPING.has_key(char):
+            if char in INVERTEDSHAPING:
                 output += INVERTEDSHAPING[char]
             else:
                 output += char
@@ -94,10 +119,17 @@ class unicode_(unicode):
         cptH = 0
         hdic = {}
         for ch in self:
-            if unicode(ch) in [FATHATAN, DAMMATAN, KASRATAN, FATHA, DAMMA, KASRA, SUKUN]:  # , SHADDA
+            if str(ch) in [
+                FATHATAN,
+                DAMMATAN,
+                KASRATAN,
+                FATHA,
+                DAMMA,
+                KASRA,
+                SUKUN,
+            ]:  # , SHADDA
                 cptH -= 1
                 if hdic.has_key(cptH):
-
                     hdic[cptH].append(ch)
                 else:
                     hdic[cptH] = ch
@@ -137,7 +169,6 @@ class unicode_(unicode):
 
     @staticmethod
     def shakl_compare(self, other):
-
         first = self.normalize_shaping(self)
         second = self.normalize_shaping(other)
         firstN = strip_tashkeel(first)
@@ -151,26 +182,32 @@ class unicode_(unicode):
             return self.compare_harakat(l1, l2)
 
     def apply_harakat_list(self, lst):
-        new = u""
+        new = ""
         for i in range(len(self)):
             new += self[i]
             if lst.has_key(i):
                 new += unicode_("".join(lst[i]))
         return new
 
-    word_sh_pattern = re.compile(u"[^ \t\r\n]+")
+    word_sh_pattern = re.compile("[^ \t\r\n]+")
 
     def tokenize_shakl(self):
         return self.word_sh_pattern.findall(self)
 
 
 # analyzers
-QStandardAnalyzer = QSpaceTokenizer() | QArabicSymbolsFilter()  # | QStopFilter(stoplist = stopwords_dyn)
-APermissibleAnalyzer = QSpaceTokenizer() | QArabicSymbolsFilter(shaping=True, tashkil=True, spellerrors=True,
-                                                                hamza=True)
+QStandardAnalyzer = (
+    QSpaceTokenizer() | QArabicSymbolsFilter()
+)  # | QStopFilter(stoplist = stopwords_dyn)
+APermissibleAnalyzer = QSpaceTokenizer() | QArabicSymbolsFilter(
+    shaping=True, tashkil=True, spellerrors=True, hamza=True
+)
 QDiacAnalyzer = QSpaceTokenizer() | QArabicSymbolsFilter(tashkil=False)
 QHighLightAnalyzer = QSpaceTokenizer() | QArabicSymbolsFilter()
 QDiacHighLightAnalyzer = QSpaceTokenizer() | QArabicSymbolsFilter(tashkil=False)
-QUthmaniAnalyzer = QSpaceTokenizer() | QArabicSymbolsFilter(shaping=True, tashkil=True, spellerrors=False, hamza=False,
-                                                            uthmani_symbols=True)
-QUthmaniDiacAnalyzer = QSpaceTokenizer() | QArabicSymbolsFilter(tashkil=False, uthmani_symbols=True)
+QUthmaniAnalyzer = QSpaceTokenizer() | QArabicSymbolsFilter(
+    shaping=True, tashkil=True, spellerrors=False, hamza=False, uthmani_symbols=True
+)
+QUthmaniDiacAnalyzer = QSpaceTokenizer() | QArabicSymbolsFilter(
+    tashkil=False, uthmani_symbols=True
+)

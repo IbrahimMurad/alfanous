@@ -65,7 +65,7 @@ def make_index(storage, indexname, word2nums, num2words):
     w = ix.writer()
     for word in word2nums.iterkeys():
         syns = synonyms(word2nums, num2words, word)
-        w.add_document(word=unicode(word), syns=syns)
+        w.add_document(word=str(word), syns=syns)
     w.commit()
     return ix
 

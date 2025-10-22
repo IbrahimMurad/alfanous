@@ -14,6 +14,9 @@
 #  $Revision: 0.1 $
 #  This program is written under the Gnu Public License.
 #
+
+# ruff: noqa: F405, F403
+
 """
 Arabic module
 
@@ -21,16 +24,16 @@ Arabic module
 @todo: statistics calculator
 
 """
-from araby_strip_functions import *
-from araby_normalizers import *
-from araby_predicates import *
-from araby_constants import *
 
+from alfanous.Support.PyArabic.araby_constants import *
+from alfanous.Support.PyArabic.araby_normalizers import *
+from alfanous.Support.PyArabic.araby_predicates import *
+from alfanous.Support.PyArabic.araby_strip_functions import *
 
 _arabic_range = None
 
 
-def order( archar ):
+def order(archar):
     """return Arabic letter order between 1 and 29.
     Alef order is 1, Yeh is 28, Hamza is 29.
     Teh Marbuta has the same ordre with Teh, 3.
@@ -39,11 +42,13 @@ def order( archar ):
     @return: arabic order.
     @rtype: integer;
     """
-    if AlphabeticOrder.has_key( archar ):
+    if AlphabeticOrder.has_key(archar):
         return AlphabeticOrder[archar]
-    else: return 0
+    else:
+        return 0
 
-def name( archar ):
+
+def name(archar):
     """return Arabic letter name in arabic.
     Alef order is 1, Yeh is 28, Hamza is 29.
     Teh Marbuta has the same ordre with Teh, 3.
@@ -52,22 +57,25 @@ def name( archar ):
     @return: arabic name.
     @rtype: unicode;
     """
-    if NAMES.has_key( archar ):
+    if NAMES.has_key(archar):
         return NAMES[archar]
     else:
-        return u''
+        return ""
+
 
 def arabicrange():
     """return a list of arabic characteres .
     Return a list of characteres between \u060c to \u0652
     @return: list of arabic characteres.
     @rtype: unicode;
-    
+
     >>> expected = map( lambda char: unichr( char ), range( 0x0600, 0x00653 ) )
     >>> arabicrange() == expected
     True
     >>> arabicrange() == expected
     True
     """
-    if _arabic_range: return _arabic_range
-    else: return map( unichr, range( 0x0600, 0x00653 ) )
+    if _arabic_range:
+        return _arabic_range
+    else:
+        return map(chr, range(0x0600, 0x00653))

@@ -15,12 +15,16 @@
 ##     You should have received a copy of the GNU Affero General Public License
 ##     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from alfanous.searching import QSearcher, QReader
-from alfanous.indexing import QseDocIndex, ExtDocIndex, BasicDocIndex
+from alfanous.indexing import BasicDocIndex, ExtDocIndex, QseDocIndex
+from alfanous.query_processing import FuzzyQuranicParser, QuranicParser, StandardParser
 from alfanous.results_processing import Qhighlight
-from alfanous.query_processing import QuranicParser, StandardParser, FuzzyQuranicParser
-from alfanous.suggestions import QAyaSpellChecker, QSubjectSpellChecker, concat_suggestions, \
-    QWordChecker
+from alfanous.searching import QReader, QSearcher
+from alfanous.suggestions import (
+    QAyaSpellChecker,
+    QSubjectSpellChecker,
+    QWordChecker,
+    concat_suggestions,
+)
 
 
 class BasicSearchEngine:
@@ -29,21 +33,34 @@ class BasicSearchEngine:
 
     """
 
-    def __init__(self, qdocindex, qparser, mainfield, otherfields, qsearcher, qreader, qspellcheckers, qhighlight):
-
+    def __init__(
+        self,
+        qdocindex,
+        qparser,
+        mainfield,
+        otherfields,
+        qsearcher,
+        qreader,
+        qspellcheckers,
+        qhighlight,
+    ):
         self.OK = False
         if qdocindex.OK:
             self._docindex = qdocindex
             #
             self._schema = self._docindex.get_schema()
-            #        
-            self._parser = qparser(self._schema, mainfield=mainfield, otherfields=otherfields)
+            #
+            self._parser = qparser(
+                self._schema, mainfield=mainfield, otherfields=otherfields
+            )
             #
             self._searcher = qsearcher(self._docindex, self._parser)
             #
             self._reader = qreader(self._docindex)
             #
-            self._spellcheckers = map(lambda X: X(self._docindex, self._parser), qspellcheckers)
+            self._spellcheckers = map(
+                lambda X: X(self._docindex, self._parser), qspellcheckers
+            )
             #
             self._highlight = qhighlight
             self.OK = True
@@ -70,10 +87,12 @@ class BasicSearchEngine:
         @return: the lists of terms and results
 
         """
-        if querystr.__class__ is not unicode:
+        if querystr.__class__ is not str:
             querystr = querystr.decode("utf-8")
 
-        results, terms, searcher = self._searcher.search(querystr, limit, sortedby, reverse)
+        results, terms, searcher = self._searcher.search(
+            querystr, limit, sortedby, reverse
+        )
         return (results, list(self._reader.term_stats(terms)), searcher)
 
     def most_frequent_words(self, nb, fieldname):
@@ -82,16 +101,18 @@ class BasicSearchEngine:
     def suggest_all(self, querystr):
         """suggest the missed words
 
-            >>> for key, value in suggest_all(u" عاصمو ").items():
-            >>>    print key, ":", ",".join(value)
-            عاصمو : عاصم
+        >>> for key, value in suggest_all(u" عاصمو ").items():
+        >>>    print key, ":", ",".join(value)
+        عاصمو : عاصم
         """
-        if querystr.__class__ is not unicode:
+        if querystr.__class__ is not str:
             querystr = querystr.decode("utf-8")
-        return concat_suggestions(map(lambda x: x.qsuggest(querystr), self._spellcheckers))
+        return concat_suggestions(
+            map(lambda x: x.qsuggest(querystr), self._spellcheckers)
+        )
 
     def autocomplete(self, querystr):
-        if querystr.__class__ is not unicode:
+        if querystr.__class__ is not str:
             querystr = querystr.decode("utf-8")
         return QAyaSpellChecker(self._docindex, self._parser).qautocomplete(querystr)
 
@@ -107,9 +128,9 @@ class BasicSearchEngine:
         return searcher.find(defaultfield, query), searcher
 
     def list_values(self, fieldname):
-        """ list all stored values of a field  """
+        """list all stored values of a field"""
         if "_reader" in self.__dict__:
-            return self._reader.list_values(fieldname )
+            return self._reader.list_values(fieldname)
         else:
             return []
 
@@ -118,49 +139,55 @@ class BasicSearchEngine:
 
 
 def QuranicSearchEngine(indexpath="../../indexes/main/", qparser=QuranicParser):
-    return BasicSearchEngine(qdocindex=QseDocIndex(indexpath)
-                             , qparser=qparser
-                             , mainfield="aya"
-                             , otherfields=[]
-                             , qsearcher=QSearcher
-                             , qreader=QReader
-                             , qspellcheckers=[QAyaSpellChecker, QSubjectSpellChecker]
-                             , qhighlight=Qhighlight
-                             )
+    return BasicSearchEngine(
+        qdocindex=QseDocIndex(indexpath),
+        qparser=qparser,
+        mainfield="aya",
+        otherfields=[],
+        qsearcher=QSearcher,
+        qreader=QReader,
+        qspellcheckers=[QAyaSpellChecker, QSubjectSpellChecker],
+        qhighlight=Qhighlight,
+    )
 
 
 def FuzzyQuranicSearchEngine(indexpath="../indexes/main/", qparser=FuzzyQuranicParser):
-    return BasicSearchEngine(qdocindex=QseDocIndex(indexpath)
-                             , qparser=qparser
-                             , mainfield="aya"
-                             , otherfields=["subject", ]
-                             , qsearcher=QSearcher
-                             , qreader=QReader
-                             , qspellcheckers=[QAyaSpellChecker, QSubjectSpellChecker]
-                             , qhighlight=Qhighlight
-                             )
+    return BasicSearchEngine(
+        qdocindex=QseDocIndex(indexpath),
+        qparser=qparser,
+        mainfield="aya",
+        otherfields=[
+            "subject",
+        ],
+        qsearcher=QSearcher,
+        qreader=QReader,
+        qspellcheckers=[QAyaSpellChecker, QSubjectSpellChecker],
+        qhighlight=Qhighlight,
+    )
 
 
 def TraductionSearchEngine(indexpath="../indexes/extend/", qparser=StandardParser):
-    """             """
-    return BasicSearchEngine(qdocindex=ExtDocIndex(indexpath)
-                             , qparser=qparser
-                             , mainfield="text"
-                             , otherfields=[]
-                             , qsearcher=QSearcher
-                             , qreader=QReader
-                             , qspellcheckers=[]
-                             , qhighlight=Qhighlight
-                             )
+    """ """
+    return BasicSearchEngine(
+        qdocindex=ExtDocIndex(indexpath),
+        qparser=qparser,
+        mainfield="text",
+        otherfields=[],
+        qsearcher=QSearcher,
+        qreader=QReader,
+        qspellcheckers=[],
+        qhighlight=Qhighlight,
+    )
 
 
 def WordSearchEngine(indexpath="../indexes/word/", qparser=StandardParser):
-    return BasicSearchEngine(qdocindex=BasicDocIndex(indexpath)
-                             , qparser=qparser  # termclass=QuranicParser.FuzzyAll
-                             , mainfield="normalized"
-                             , otherfields=["word", "spelled"]
-                             , qsearcher=QSearcher
-                             , qreader=QReader
-                             , qspellcheckers=[QWordChecker]
-                             , qhighlight=Qhighlight
-                             )
+    return BasicSearchEngine(
+        qdocindex=BasicDocIndex(indexpath),
+        qparser=qparser,  # termclass=QuranicParser.FuzzyAll
+        mainfield="normalized",
+        otherfields=["word", "spelled"],
+        qsearcher=QSearcher,
+        qreader=QReader,
+        qspellcheckers=[QWordChecker],
+        qhighlight=Qhighlight,
+    )

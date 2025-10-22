@@ -1,8 +1,18 @@
-from araby_constants import *
+# ruff: noqa: F405
 
-__all__ = ['stripHarakat','stripTashkeel','strip_tashkeel','stripTatweel','strip_tatweel','strip_shadda']
+from alfanous.Support.PyArabic.araby_constants import *  # noqa: F403
 
-def stripHarakat( text ):
+__all__ = [
+    "stripHarakat",
+    "stripTashkeel",
+    "strip_tashkeel",
+    "stripTatweel",
+    "strip_tatweel",
+    "strip_shadda",
+]
+
+
+def stripHarakat(text):
     """Strip Harakat from arabic word except Shadda.
     The striped marks are :
         - FATHA, DAMMA, KASRA
@@ -12,7 +22,7 @@ def stripHarakat( text ):
     @type text: unicode.
     @return: return a striped text.
     @rtype: unicode.
-    
+
     >>> stripHarakat( '' )
     ''
     >>> stripHarakat( 'abc' )
@@ -26,9 +36,10 @@ def stripHarakat( text ):
     >>> stripHarakat( FATHA + ALEF + BEH + DAMMA + TEH + KASRATAN ) == ( ALEF + BEH + TEH )
     True
     """
-    return  filter( lambda letter: letter not in HARAKAT, text)
+    return "".join(filter(lambda letter: letter not in HARAKAT, text))
 
-def stripTashkeel( text ):
+
+def stripTashkeel(text):
     """Strip vowels from a text, include Shadda.
     The striped marks are :
         - FATHA, DAMMA, KASRA
@@ -39,7 +50,7 @@ def stripTashkeel( text ):
     @type text: unicode.
     @return: return a striped text.
     @rtype: unicode.
-    
+
     >>> stripTashkeel( '' )
     ''
     >>> stripTashkeel( 'abc' )
@@ -53,9 +64,10 @@ def stripTashkeel( text ):
     >>> stripTashkeel( FATHA + ALEF + SHADDA + BEH + DAMMA + TEH + KASRATAN ) == ( ALEF + BEH + TEH )
     True
     """
-    return filter( lambda letter: letter not in TASHKEEL, text )
+    return "".join(filter(lambda letter: letter not in TASHKEEL, text))
 
-def stripTatweel( text ):
+
+def stripTatweel(text):
     """
     Strip tatweel from a text and return a result text.
 
@@ -63,7 +75,7 @@ def stripTatweel( text ):
     @type text: unicode.
     @return: return a striped text.
     @rtype: unicode.
-    
+
     >>> stripTatweel( '' )
     ''
     >>> stripTatweel( 'abc' )
@@ -75,12 +87,13 @@ def stripTatweel( text ):
     >>> stripTatweel( TATWEEL + ALEF + BEH +  TATWEEL + TEH + TATWEEL ) == (ALEF + BEH + TEH)
     True
     """
-    return filter( lambda letter: letter != TATWEEL, text )
+    return "".join(filter(lambda letter: letter != TATWEEL, text))
+
 
 def strip_tashkeel(w):
-    '''
+    """
     strip vowel from a word and return a result word
-    
+
     >>> strip_tashkeel( '' )
     ''
     >>> strip_tashkeel( 'abc' )
@@ -93,13 +106,14 @@ def strip_tashkeel(w):
     True
     >>> strip_tashkeel( FATHA + ALEF + SHADDA + BEH + DAMMA + TEH + KASRATAN ) == ( ALEF + BEH + TEH )
     True
-    '''
+    """
     return stripTashkeel(w)
 
+
 def strip_tatweel(w):
-    '''
+    """
     strip tatweel from a word and return a result word
-    
+
     >>> strip_tatweel( '' )
     ''
     >>> strip_tatweel( 'abc' )
@@ -110,16 +124,17 @@ def strip_tatweel(w):
     True
     >>> strip_tatweel( TATWEEL + ALEF + BEH +  TATWEEL + TEH + TATWEEL ) == (ALEF + BEH + TEH)
     True
-    '''
+    """
     return stripTatweel(w)
 
+
 def strip_shadda(w):
-    '''
+    """
     strip tatweel from a word and return a result word
-    
+
     >>> strip_shadda('')
     ''
     >>> strip_shadda(SHADDA + ALEF + BEH + SHADDA + TEH + SHADDA) == (ALEF + BEH + TEH)
     True
-    '''
-    return filter(lambda letter: letter != SHADDA, w)
+    """
+    return "".join(filter(lambda letter: letter != SHADDA, w))

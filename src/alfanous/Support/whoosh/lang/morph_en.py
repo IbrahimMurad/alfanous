@@ -1097,7 +1097,7 @@ rules = (
 
 _partition_size = 20
 _partitions = []
-for p in xrange(0, len(rules) // _partition_size + 1):
+for p in range(0, len(rules) // _partition_size + 1):
     start = p * _partition_size
     end = (p + 1) * _partition_size
     pattern = "|".join(

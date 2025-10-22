@@ -138,3 +138,5 @@ Icon?
 desktop.ini
 venv/
 
+# vscode
+.vscode/
