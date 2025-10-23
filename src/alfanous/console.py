@@ -39,7 +39,6 @@ HELPMESSAGES = RAWoutput.do({"action": "show", "query": "help_messages"})["show"
 arg_parser = ArgumentParser(
     description=INFORMATION["description"],
     prog="alfanous-console",
-    version="%(prog)s " + INFORMATION["version"],
     usage=sys.argv[0] + " [flags]",
 )
 
@@ -274,3 +273,7 @@ def main():
         print(json.dumps(RAWoutput.do(flags), sort_keys=False, indent=4))
     else:
         print(RAWoutput._information["console_note"])
+
+
+if __name__ == "__main__":
+    main()

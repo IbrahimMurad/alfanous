@@ -166,7 +166,7 @@ def guess_romanization_system():
 def transliterate(mode, string, ignore="", reverse=False):
     """encode & decode different  romanization systems"""
 
-    if ROMANIZATION_SYSTEMS_MAPPINGS.has_key(mode):
+    if mode in ROMANIZATION_SYSTEMS_MAPPINGS:
         MAPPING = ROMANIZATION_SYSTEMS_MAPPINGS[mode]
     else:
         MAPPING = {}
@@ -181,7 +181,7 @@ def transliterate(mode, string, ignore="", reverse=False):
 
     result = ""
     for char in string:
-        if mapping.has_key(char) and char not in ignore:
+        if char in mapping and char not in ignore:
             result += mapping[char]  # test
         else:
             result += char

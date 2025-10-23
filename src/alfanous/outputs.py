@@ -288,18 +288,10 @@ class Raw:
 
     def _do(self, flags):
         action = (
-            flags["action"]
-            if flags.has_key("action")
-            else self._defaults["flags"]["action"]
+            flags["action"] if "action" in flags else self._defaults["flags"]["action"]
         )
-        unit = (
-            flags["unit"] if flags.has_key("unit") else self._defaults["flags"]["unit"]
-        )
-        query = (
-            flags["query"]
-            if flags.has_key("query")
-            else self._defaults["flags"]["query"]
-        )
+        unit = flags["unit"] if "unit" in flags else self._defaults["flags"]["unit"]
+        query = flags["query"] if "query" in flags else self._defaults["flags"]["query"]
 
         # init the error message with Succes
         output = self._check(0, flags)
@@ -349,7 +341,7 @@ class Raw:
         # Incrementation
         for ident in ["TOTAL"]:  # ["TOTAL",flags[ident]]
             stats[ident]["total"] += 1
-            if flags.has_key("action"):
+            if "action" in flags:
                 action = flags["action"]
                 if action in self._domains["action"]:
                     stats[ident][action]["total"] += 1
@@ -370,14 +362,10 @@ class Raw:
 
     def _show(self, flags):
         """show metadata"""
-        query = (
-            flags["query"]
-            if flags.has_key("query")
-            else self._defaults["flags"]["query"]
-        )
+        query = flags["query"] if "query" in flags else self._defaults["flags"]["query"]
         if query == "all":
             return {"show": self._all}
-        elif self._all.has_key(query):
+        elif query in self._all:
             return {"show": {query: self._all[query]}}
         else:
             return {"show": None}
@@ -395,11 +383,7 @@ class Raw:
 
     def _suggest_aya(self, flags):
         """return suggestions for aya words"""
-        query = (
-            flags["query"]
-            if flags.has_key("query")
-            else self._defaults["flags"]["query"]
-        )
+        query = flags["query"] if "query" in flags else self._defaults["flags"]["query"]
         # preprocess query
         query = query.replace("\\", "")
         if not isinstance(query, str):
@@ -435,61 +419,53 @@ class Raw:
         return the results of aya search as a dictionary data structure
         """
         # flags
-        query = (
-            flags["query"]
-            if flags.has_key("query")
-            else self._defaults["flags"]["query"]
-        )
+        query = flags["query"] if "query" in flags else self._defaults["flags"]["query"]
         sortedby = (
             flags["sortedby"]
-            if flags.has_key("sortedby")
+            if "sortedby" in flags
             else self._defaults["flags"]["sortedby"]
         )
         range = (
             int(flags["perpage"])
-            if flags.has_key("perpage")
+            if "perpage" in flags
             else flags["range"]
-            if flags.has_key("range")
+            if "range" in flags
             else self._defaults["flags"]["range"]
         )
         ## offset = (page-1) * perpage   --  mode paging
         offset = (
             ((int(flags["page"]) - 1) * range) + 1
-            if flags.has_key("page")
+            if "page" in flags
             else int(flags["offset"])
-            if flags.has_key("offset")
+            if "offset" in flags
             else self._defaults["flags"]["offset"]
         )
         recitation = (
             flags["recitation"]
-            if flags.has_key("recitation")
+            if "recitation" in flags
             else self._defaults["flags"]["recitation"]
         )
         translation = (
             flags["translation"]
-            if flags.has_key("translation")
+            if "translation" in flags
             else self._defaults["flags"]["translation"]
         )
         romanization = (
             flags["romanization"]
-            if flags.has_key("romanization")
+            if "romanization" in flags
             else self._defaults["flags"]["romanization"]
         )
         highlight = (
             flags["highlight"]
-            if flags.has_key("highlight")
+            if "highlight" in flags
             else self._defaults["flags"]["highlight"]
         )
         script = (
-            flags["script"]
-            if flags.has_key("script")
-            else self._defaults["flags"]["script"]
+            flags["script"] if "script" in flags else self._defaults["flags"]["script"]
         )
         vocalized = IS_FLAG(flags, "vocalized")
         fuzzy = IS_FLAG(flags, "fuzzy")
-        view = (
-            flags["view"] if flags.has_key("view") else self._defaults["flags"]["view"]
-        )
+        view = flags["view"] if "view" in flags else self._defaults["flags"]["view"]
 
         # pre-defined views
         if view == "minimal":
@@ -679,12 +655,12 @@ class Raw:
                     if word_vocalizations:
                         vocalizations = (
                             vocalization_dict[strip_vocalization(term[1])]
-                            if vocalization_dict.has_key(strip_vocalization(term[1]))
+                            if strip_vocalization(term[1]) in vocalization_dict
                             else []
                         )
                         nb_vocalizations_globale += len(vocalizations)
                     if word_synonyms:
-                        synonyms = syndict[term[1]] if syndict.has_key(term[1]) else []
+                        synonyms = syndict[term[1]] if term[1] in syndict else []
                     derivations_extra = []
                     if word_derivations:
                         lemma = LOCATE(
@@ -858,7 +834,7 @@ class Raw:
                     output["words"]["individual"][cpt]["word"]
                 )
                 # print current_word.encode( "utf-8" ), "=>", annotations_by_word, "=>", list( annot_res )
-                if annotations_by_word.has_key(current_word):
+                if current_word in annotations_by_word:
                     current_word_annotations = annotations_by_word[current_word]
                     output["words"]["individual"][cpt]["annotations"] = (
                         current_word_annotations
@@ -903,7 +879,7 @@ class Raw:
                     )
                     else None,
                     "recitation": None
-                    if not recitation or not self._recitations.has_key(recitation)
+                    if not recitation or recitation not in self._recitations
                     else "https://www.everyayah.com/data/"
                     + self._recitations[recitation]["subfolder"].encode("utf-8")
                     + "/%03d%03d.mp3" % (r["sura_id"], r["aya_id"]),
@@ -992,34 +968,28 @@ class Raw:
         return the results of translation search as a dictionary data structure
         """
         # flags
-        query = (
-            flags["query"]
-            if flags.has_key("query")
-            else self._defaults["flags"]["query"]
-        )
+        query = flags["query"] if "query" in flags else self._defaults["flags"]["query"]
         range = (
             int(flags["perpage"])
-            if flags.has_key("perpage")
+            if "perpage" in flags
             else flags["range"]
-            if flags.has_key("range")
+            if "range" in flags
             else self._defaults["flags"]["range"]
         )
         ## offset = (page-1) * perpage   --  mode paging
         offset = (
             ((int(flags["page"]) - 1) * range) + 1
-            if flags.has_key("page")
+            if "page" in flags
             else int(flags["offset"])
-            if flags.has_key("offset")
+            if "offset" in flags
             else self._defaults["flags"]["offset"]
         )
         highlight = (
             flags["highlight"]
-            if flags.has_key("highlight")
+            if "highlight" in flags
             else self._defaults["flags"]["highlight"]
         )
-        view = (
-            flags["view"] if flags.has_key("view") else self._defaults["flags"]["view"]
-        )
+        view = flags["view"] if "view" in flags else self._defaults["flags"]["view"]
 
         # pre-defined views
         if view == "minimal":
@@ -1145,49 +1115,41 @@ class Raw:
         return the results of word search as a dictionary data structure
         """
         # flags
-        query = (
-            flags["query"]
-            if flags.has_key("query")
-            else self._defaults["flags"]["query"]
-        )
+        query = flags["query"] if "query" in flags else self._defaults["flags"]["query"]
         sortedby = (
             flags["sortedby"]
-            if flags.has_key("sortedby")
+            if "sortedby" in flags
             else self._defaults["flags"]["sortedby"]
         )
         range = (
             int(flags["perpage"])
-            if flags.has_key("perpage")
+            if "perpage" in flags
             else flags["range"]
-            if flags.has_key("range")
+            if "range" in flags
             else self._defaults["flags"]["range"]
         )
         offset = (
             ((int(flags["page"]) - 1) * range) + 1
-            if flags.has_key("page")
+            if "page" in flags
             else int(flags["offset"])
-            if flags.has_key("offset")
+            if "offset" in flags
             else self._defaults["flags"]["offset"]
         )
         romanization = (
             flags["romanization"]
-            if flags.has_key("romanization")
+            if "romanization" in flags
             else self._defaults["flags"]["romanization"]
         )
         highlight = (
             flags["highlight"]
-            if flags.has_key("highlight")
+            if "highlight" in flags
             else self._defaults["flags"]["highlight"]
         )
         script = (
-            flags["script"]
-            if flags.has_key("script")
-            else self._defaults["flags"]["script"]
+            flags["script"] if "script" in flags else self._defaults["flags"]["script"]
         )
         vocalized = IS_FLAG(flags, "vocalized")
-        view = (
-            flags["view"] if flags.has_key("view") else self._defaults["flags"]["view"]
-        )
+        view = flags["view"] if "view" in flags else self._defaults["flags"]["view"]
 
         # pre-defined views
         if view == "minimal":
